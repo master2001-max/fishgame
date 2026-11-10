@@ -1,66 +1,135 @@
-import React, { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Login from './components/Login';
 import Register from './components/Register';
 import MainMenu from './components/MainMenu';
 import GameScreen from './components/GameScreen';
 import Leaderboard from './components/Leaderboard';
 import Settings from './components/Settings';
+import OceanBackdrop from './components/OceanBackdrop';
+import {
+  loadSettings,
+  loadStats,
+  loadUser,
+  recordGameStats,
+  saveSettings,
+  saveUser,
+} from './utils/storage';
+import { soundEngine } from './utils/sound';
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState('login'); // 'login' | 'register' | 'menu' | 'game' | 'leaderboard' | 'settings'
-  const [currentUser, setCurrentUser] = useState('');
+  const [currentUser, setCurrentUser] = useState(() => loadUser());
+  const [currentScreen, setCurrentScreen] = useState(() =>
+    loadUser() ? 'menu' : 'login'
+  );
+  const [settings, setSettings] = useState(() => loadSettings());
+  const [stats, setStats] = useState(() => loadStats());
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+
+  // Sync audio preferences
+  useEffect(() => {
+    soundEngine.setSfxEnabled(settings.sfx);
+    if (audioUnlocked) {
+      soundEngine.setMusicEnabled(settings.music);
+    }
+  }, [settings.sfx, settings.music, audioUnlocked]);
+
+  const unlockAudioIfNeeded = useCallback(() => {
+    if (!audioUnlocked) {
+      setAudioUnlocked(true);
+      soundEngine.setSfxEnabled(settings.sfx);
+      soundEngine.setMusicEnabled(settings.music);
+    }
+  }, [audioUnlocked, settings.music, settings.sfx]);
 
   const handleAuthSuccess = (username) => {
+    unlockAudioIfNeeded();
+    saveUser(username);
     setCurrentUser(username);
-    setCurrentScreen('menu'); // Goes to Hunter's Hub
+    setCurrentScreen('menu');
   };
 
   const handleLogout = () => {
+    saveUser('');
     setCurrentUser('');
     setCurrentScreen('login');
   };
 
   const handleNavigation = (destination) => {
-    setCurrentScreen(destination); // Switches to 'game', 'leaderboard', or 'settings'
+    unlockAudioIfNeeded();
+    setCurrentScreen(destination);
   };
 
+  const handleUpdateSettings = useCallback(
+    (nextSettings) => {
+      unlockAudioIfNeeded();
+      setSettings(nextSettings);
+      saveSettings(nextSettings);
+    },
+    [unlockAudioIfNeeded]
+  );
+
+  const handleMissionComplete = useCallback((summary) => {
+    const result = recordGameStats(summary);
+    setStats(result.stats);
+    return result;
+  }, []);
+
   return (
-    <main className="w-screen h-screen overflow-hidden bg-[url('https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1920&q=80')] bg-cover bg-center flex items-center justify-center">
-      
-      {currentScreen === 'login' && (
-        <Login 
-          onLoginSuccess={handleAuthSuccess}
-          onSwitchToRegister={() => setCurrentScreen('register')}
-        />
-      )}
+    <main className="relative min-h-screen w-full overflow-x-hidden flex items-center justify-center">
+      <OceanBackdrop />
 
-      {currentScreen === 'register' && (
-        <Register 
-          onRegisterSuccess={handleAuthSuccess}
-          onSwitchToLogin={() => setCurrentScreen('login')}
-        />
-      )}
+      <div className="relative z-10 w-full flex items-center justify-center py-2">
+        {currentScreen === 'login' && (
+          <Login
+            onLoginSuccess={handleAuthSuccess}
+            onSwitchToRegister={() => setCurrentScreen('register')}
+          />
+        )}
 
-      {currentScreen === 'menu' && (
-        <MainMenu 
-          username={currentUser}
-          onNavigate={handleNavigation}
-          onLogout={handleLogout}
-        />
-      )}
+        {currentScreen === 'register' && (
+          <Register
+            onRegisterSuccess={handleAuthSuccess}
+            onSwitchToLogin={() => setCurrentScreen('login')}
+          />
+        )}
 
-      {currentScreen === 'game' && (
-        <GameScreen onReturnHome={() => setCurrentScreen('menu')} />
-      )}
+        {currentScreen === 'menu' && (
+          <MainMenu
+            username={currentUser}
+            stats={stats}
+            settings={settings}
+            onNavigate={handleNavigation}
+            onLogout={handleLogout}
+          />
+        )}
 
-      {currentScreen === 'leaderboard' && (
-        <Leaderboard onReturnHome={() => setCurrentScreen('menu')} />
-      )}
+        {currentScreen === 'game' && (
+          <GameScreen
+            settings={settings}
+            bestScore={stats.bestScore}
+            onUpdateSettings={handleUpdateSettings}
+            onMissionComplete={handleMissionComplete}
+            onReturnHome={() => setCurrentScreen('menu')}
+            onOpenLeaderboard={() => setCurrentScreen('leaderboard')}
+          />
+        )}
 
-      {currentScreen === 'settings' && (
-        <Settings onReturnHome={() => setCurrentScreen('menu')} />
-      )}
+        {currentScreen === 'leaderboard' && (
+          <Leaderboard
+            username={currentUser}
+            stats={stats}
+            onReturnHome={() => setCurrentScreen('menu')}
+          />
+        )}
 
+        {currentScreen === 'settings' && (
+          <Settings
+            settings={settings}
+            onUpdateSettings={handleUpdateSettings}
+            onReturnHome={() => setCurrentScreen('menu')}
+          />
+        )}
+      </div>
     </main>
   );
 }

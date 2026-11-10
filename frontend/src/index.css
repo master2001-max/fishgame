@@ -1,1 +1,197 @@
 @import "tailwindcss";
+
+@theme {
+  --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  html,
+  body {
+    font-family: var(--font-sans);
+    background-color: #020b18;
+    color: #f1f5f9;
+    margin: 0;
+    padding: 0;
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+  }
+}
+
+@keyframes floatSlow {
+  0%,
+  100% {
+    transform: translateY(0px) translateX(0px);
+  }
+  50% {
+    transform: translateY(-14px) translateX(6px);
+  }
+}
+
+@keyframes raySway {
+  0%,
+  100% {
+    opacity: 0.14;
+    transform: skewX(-14deg) translateX(0px);
+  }
+  50% {
+    opacity: 0.26;
+    transform: skewX(-10deg) translateX(18px);
+  }
+}
+
+@keyframes riseBubble {
+  0% {
+    transform: translateY(20px) scale(0.85);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.5;
+  }
+  85% {
+    opacity: 0.35;
+  }
+  100% {
+    transform: translateY(-100vh) scale(1.15);
+    opacity: 0;
+  }
+}
+
+@keyframes shimmerSweep {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(220%) skewX(-18deg);
+  }
+}
+
+@keyframes modalEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 6s ease-in-out infinite;
+}
+
+.animate-ray-sway {
+  animation: raySway 9s ease-in-out infinite;
+}
+
+.animate-modal-enter {
+  animation: modalEnter 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.glass-panel {
+  background: linear-gradient(
+    160deg,
+    rgba(10, 31, 58, 0.78) 0%,
+    rgba(5, 17, 34, 0.88) 100%
+  );
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(103, 232, 249, 0.16);
+  box-shadow:
+    0 24px 60px -15px rgba(1, 8, 20, 0.85),
+    inset 0 1px 0 0 rgba(186, 230, 253, 0.18);
+}
+
+.glass-subcard {
+  background: rgba(15, 41, 74, 0.45);
+  border: 1px solid rgba(148, 210, 255, 0.12);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+}
+
+.glass-input {
+  background: rgba(3, 13, 28, 0.65);
+  border: 1px solid rgba(103, 232, 249, 0.18);
+  color: #f8fafc;
+  transition: all 0.2s ease;
+}
+
+.glass-input::placeholder {
+  color: rgba(148, 163, 184, 0.6);
+}
+
+.glass-input:focus {
+  outline: none;
+  background: rgba(6, 20, 40, 0.9);
+  border-color: rgba(34, 211, 238, 0.75);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.16);
+}
+
+.btn-ocean-primary {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #22d3ee 0%, #0ea5e9 55%, #0284c7 100%);
+  color: #031526;
+  font-weight: 700;
+  box-shadow:
+    0 10px 25px -5px rgba(14, 165, 233, 0.45),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.45);
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
+}
+
+.btn-ocean-primary:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+  box-shadow:
+    0 14px 30px -5px rgba(34, 211, 238, 0.55),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.55);
+}
+
+.btn-ocean-primary:active {
+  transform: translateY(0px) scale(0.99);
+}
+
+.btn-ocean-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    transparent
+  );
+  transform: translateX(-140%) skewX(-18deg);
+}
+
+.btn-ocean-primary:hover::after {
+  animation: shimmerSweep 0.75s ease forwards;
+}
+
+.btn-ocean-secondary {
+  background: rgba(15, 43, 76, 0.65);
+  border: 1px solid rgba(103, 232, 249, 0.22);
+  color: #e2e8f0;
+  transition: all 0.18s ease;
+}
+
+.btn-ocean-secondary:hover {
+  background: rgba(23, 59, 102, 0.85);
+  border-color: rgba(103, 232, 249, 0.45);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
