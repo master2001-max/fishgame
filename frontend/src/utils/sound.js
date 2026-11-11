@@ -139,9 +139,8 @@ class SoundEngine {
     this.playTone({ freq: 260, endFreq: 140, duration: 0.12, type: 'triangle', volume: 0.06, delay: 0.05 });
   }
 
-  playCatch(combo = 1, isRare = false) {
-    const semitoneBoost = Math.min(combo - 1, 7) * 35;
-    const base = 480 + semitoneBoost;
+  playCatch(isRare = false) {
+    const base = 520;
     this.playTone({ freq: base, endFreq: base * 1.35, duration: 0.13, type: 'sine', volume: 0.13 });
     this.playTone({
       freq: base * 1.5,
@@ -194,6 +193,19 @@ class SoundEngine {
         type: 'sine',
         volume: 0.11,
         delay: idx * 0.11,
+      });
+    });
+  }
+
+  playMissionFailed() {
+    const notes = [392, 349.23, 293.66, 220];
+    notes.forEach((n, idx) => {
+      this.playTone({
+        freq: n,
+        duration: 0.22,
+        type: 'sine',
+        volume: 0.1,
+        delay: idx * 0.12,
       });
     });
   }

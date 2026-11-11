@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PauseModal from './PauseModal';
 import {
   AnchorHookIcon,
@@ -12,15 +12,17 @@ import {
 import {
   DIFFICULTY_CONFIG,
   FISH_SPECIES,
+  LEVELS_PER_DIFFICULTY,
   LURE_STYLES,
+  getLevelTargetMarks,
+  getNextStage,
+  normalizeDifficulty,
 } from '../utils/gameConfig';
 import { soundEngine } from '../utils/sound';
 
 const LOGICAL_W = 880;
 const LOGICAL_H = 460;
 const WATER_SURFACE_Y = 78;
-const MISSION_DURATION = 60;
-const LEVEL_STEP_SCORE = 750;
 
 function createFishEntity(species, startOffscreen = false) {
   const dir = Math.random() > 0.5 ? 1 : -1;
@@ -40,7 +42,7 @@ function createFishEntity(species, startOffscreen = false) {
     y,
     baseY: y,
     dir,
-    speed: species.speedBase * (0.9 + Math.random() * 0.25),
+    speed: species.speedBase * (0.9 + Math.random() * 0.22),
     phase: Math.random() * Math.PI * 2,
     bobAmp: 3 + Math.random() * 5,
   };
@@ -54,7 +56,7 @@ function createJellyfishEntity(index) {
     y: 195 + index * 95,
     baseY: 195 + index * 95,
     dir,
-    speed: 0.85 + Math.random() * 0.35,
+    speed: 0.85 + Math.random() * 0.3,
     phase: Math.random() * Math.PI * 2,
   };
 }
@@ -65,12 +67,12 @@ function createPearlEntity() {
     x: 110 + Math.random() * (LOGICAL_W - 220),
     y: 355 + Math.random() * 45,
     phase: Math.random() * Math.PI * 2,
-    life: 14, // seconds before relocating
+    life: 14,
   };
 }
 
-function createInitialFishes() {
-  const pool = [
+function createInitialFishes(count = 8) {
+  const basePool = [
     FISH_SPECIES[0],
     FISH_SPECIES[0],
     FISH_SPECIES[1],
@@ -79,14 +81,16 @@ function createInitialFishes() {
     FISH_SPECIES[3],
     FISH_SPECIES[4],
     FISH_SPECIES[5],
+    FISH_SPECIES[2],
   ];
-  return pool.map((sp) => createFishEntity(sp, false));
+  return basePool.slice(0, count).map((sp) => createFishEntity(sp, false));
 }
 
 function pickNextSpecies(level) {
   const roll = Math.random();
-  if (roll < 0.1 + Math.min(level * 0.025, 0.1)) return FISH_SPECIES[5]; // Biolume
-  if (roll < 0.28) return FISH_SPECIES[4]; // Angelfish
+  const bonus = Math.min((level - 1) * 0.02, 0.1);
+  if (roll < 0.1 + bonus) return FISH_SPECIES[5]; // Biolume
+  if (roll < 0.28 + bonus) return FISH_SPECIES[4]; // Angelfish
   if (roll < 0.48) return FISH_SPECIES[3]; // Redfin
   if (roll < 0.68) return FISH_SPECIES[2]; // Barb
   if (roll < 0.85) return FISH_SPECIES[1]; // Tetra
@@ -95,73 +99,76 @@ function pickNextSpecies(level) {
 
 export default function GameScreen({
   settings,
+  level,
   bestScore,
   onUpdateSettings,
   onMissionComplete,
+  onAdvanceStage,
   onReturnHome,
   onOpenLeaderboard,
 }) {
   const canvasRef = useRef(null);
 
+  const activeDifficulty = normalizeDifficulty(settings.difficulty);
+  const diffConf = DIFFICULTY_CONFIG[activeDifficulty];
+  const targetMarks = getLevelTargetMarks(activeDifficulty, level);
+  const nextStage = getNextStage(activeDifficulty, level);
+
   const [runId, setRunId] = useState(0);
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(MISSION_DURATION);
-  const [level, setLevel] = useState(1);
-  const [combo, setCombo] = useState(1);
+  const [timeLeft, setTimeLeft] = useState(diffConf.duration);
   const [catches, setCatches] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [missionStatus, setMissionStatus] = useState('playing'); // 'playing' | 'won' | 'lost'
   const [runStartBestScore, setRunStartBestScore] = useState(bestScore);
-  const [runBestCombo, setRunBestCombo] = useState(1);
   const [lastCatchBanner, setLastCatchBanner] = useState(
-    'Move mouse or A/D to steer boat · Click or Space to drop hook'
+    `Target: ${targetMarks.toLocaleString()} marks · Steer with mouse or A/D · Click or Space to drop hook`
   );
 
-  const gameOver = timeLeft <= 0;
-  const isNewHighScore = gameOver && score > runStartBestScore && score > 0;
+  const isEnded = missionStatus !== 'playing';
+  const isNewHighScore =
+    missionStatus === 'won' && score > runStartBestScore && score > 0;
 
   const isPausedRef = useRef(isPaused);
-  const gameOverRef = useRef(gameOver);
+  const missionStatusRef = useRef(missionStatus);
   const settingsRef = useRef(settings);
   const reportedRunRef = useRef(-1);
 
   const scoreRef = useRef(0);
   const catchesRef = useRef(0);
-  const bestComboRef = useRef(1);
 
   useEffect(() => {
     isPausedRef.current = isPaused;
   }, [isPaused]);
 
   useEffect(() => {
-    gameOverRef.current = gameOver;
-  }, [gameOver]);
+    missionStatusRef.current = missionStatus;
+  }, [missionStatus]);
 
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
 
-  const restartMission = useCallback(() => {
+  const restartMission = () => {
     scoreRef.current = 0;
     catchesRef.current = 0;
-    bestComboRef.current = 1;
+    missionStatusRef.current = 'playing';
     setScore(0);
-    setTimeLeft(MISSION_DURATION);
-    setLevel(1);
-    setCombo(1);
+    setTimeLeft(diffConf.duration);
     setCatches(0);
+    setMissionStatus('playing');
     setRunStartBestScore(bestScore);
-    setRunBestCombo(1);
     setIsPaused(false);
     setLastCatchBanner(
-      'Move mouse or A/D to steer boat · Click or Space to drop hook'
+      `Target: ${targetMarks.toLocaleString()} marks · Steer with mouse or A/D · Click or Space to drop hook`
     );
     setRunId((id) => id + 1);
-  }, [bestScore]);
+  };
 
   // Keyboard pause shortcut (Esc / P)
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (gameOverRef.current) return;
+      if (missionStatusRef.current !== 'playing') return;
       if (e.key === 'Escape' || e.key.toLowerCase() === 'p') {
         e.preventDefault();
         soundEngine.playClick();
@@ -174,25 +181,41 @@ export default function GameScreen({
 
   // Countdown Timer Effect
   useEffect(() => {
-    if (gameOver || isPaused) return;
+    if (missionStatus !== 'playing' || isPaused) return;
     const timer = setInterval(() => {
       setTimeLeft((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
     return () => clearInterval(timer);
-  }, [gameOver, isPaused, runId]);
+  }, [missionStatus, isPaused, runId]);
 
-  // Report mission stats once when Game Over triggers
+  // Check time expiry
   useEffect(() => {
-    if (gameOver && reportedRunRef.current !== runId) {
+    if (timeLeft <= 0 && missionStatus === 'playing') {
+      const nextStatus = scoreRef.current >= targetMarks ? 'won' : 'lost';
+      missionStatusRef.current = nextStatus;
+      setMissionStatus(nextStatus);
+    }
+  }, [timeLeft, missionStatus, targetMarks]);
+
+  // Report mission outcome once per run
+  useEffect(() => {
+    if (missionStatus !== 'playing' && reportedRunRef.current !== runId) {
       reportedRunRef.current = runId;
-      soundEngine.playGameOver();
+      const won = missionStatus === 'won';
+      if (won) {
+        soundEngine.playLevelUp();
+      } else {
+        soundEngine.playMissionFailed();
+      }
       onMissionComplete({
+        difficulty: activeDifficulty,
+        level,
         score: scoreRef.current,
         catches: catchesRef.current,
-        bestCombo: bestComboRef.current,
+        won,
       });
     }
-  }, [gameOver, runId, onMissionComplete]);
+  }, [missionStatus, runId, activeDifficulty, level, onMissionComplete]);
 
   // Main Canvas Engine Loop
   useEffect(() => {
@@ -205,8 +228,7 @@ export default function GameScreen({
     canvas.width = LOGICAL_W * dpr;
     canvas.height = LOGICAL_H * dpr;
 
-    const diffConf =
-      DIFFICULTY_CONFIG[settingsRef.current.difficulty] || DIFFICULTY_CONFIG.Easy;
+    const stageDiff = DIFFICULTY_CONFIG[activeDifficulty];
 
     const state = {
       time: 0,
@@ -215,11 +237,11 @@ export default function GameScreen({
       hookY: WATER_SURFACE_Y + 14,
       hookState: 'idle', // 'idle' | 'dropping' | 'retracting'
       caughtEntity: null,
-      fishes: createInitialFishes(),
-      jellyfishes: Array.from({ length: diffConf.jellyfishCount }, (_, i) =>
+      fishes: createInitialFishes(stageDiff.fishCount),
+      jellyfishes: Array.from({ length: stageDiff.jellyfishCount }, (_, i) =>
         createJellyfishEntity(i)
       ),
-      pearl: Math.random() < 0.6 ? createPearlEntity() : null,
+      pearl: Math.random() < 0.65 ? createPearlEntity() : null,
       pearlCooldown: 6,
       bubbles: Array.from({ length: 24 }, () => ({
         x: Math.random() * LOGICAL_W,
@@ -238,11 +260,8 @@ export default function GameScreen({
       popups: [],
       keys: { left: false, right: false },
       shakeTime: 0,
-      combo: 1,
-      level: 1,
       score: 0,
       catches: 0,
-      bestCombo: 1,
       wasSubmerged: false,
       lastTime: performance.now(),
     };
@@ -281,7 +300,7 @@ export default function GameScreen({
       Math.cos(x * 0.032 - t * 1.6) * 2;
 
     const triggerDrop = () => {
-      if (isPausedRef.current || gameOverRef.current) return;
+      if (isPausedRef.current || missionStatusRef.current !== 'playing') return;
       if (state.hookState === 'idle') {
         state.hookState = 'dropping';
         soundEngine.playCast();
@@ -295,12 +314,12 @@ export default function GameScreen({
     };
 
     const handlePointerMove = (e) => {
-      if (isPausedRef.current || gameOverRef.current) return;
+      if (isPausedRef.current || missionStatusRef.current !== 'playing') return;
       state.targetBoatX = getCanvasX(e.clientX);
     };
 
     const handlePointerDown = (e) => {
-      if (isPausedRef.current || gameOverRef.current) return;
+      if (isPausedRef.current || missionStatusRef.current !== 'playing') return;
       const x = getCanvasX(e.clientX);
       state.targetBoatX = x;
       if (e.pointerType === 'touch' && state.hookState === 'idle') {
@@ -315,7 +334,7 @@ export default function GameScreen({
       } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
         state.keys.right = true;
       } else if (e.key === ' ' || e.key === 'ArrowDown') {
-        if (!isPausedRef.current && !gameOverRef.current) {
+        if (!isPausedRef.current && missionStatusRef.current === 'playing') {
           e.preventDefault();
           triggerDrop();
         }
@@ -348,7 +367,6 @@ export default function GameScreen({
         ctx.scale(-1, 1);
       }
 
-      // Soft bioluminescent aura for Rare / Mythic species
       if (species.rarity === 'Mythic' || species.rarity === 'Rare') {
         ctx.save();
         ctx.shadowColor = species.color;
@@ -360,7 +378,7 @@ export default function GameScreen({
         ctx.restore();
       }
 
-      // Tail fin with smooth sinusoidal wag
+      // Tail fin
       ctx.fillStyle = species.accentColor;
       ctx.beginPath();
       ctx.moveTo(-species.sizeX * 0.72, 0);
@@ -379,7 +397,7 @@ export default function GameScreen({
       ctx.closePath();
       ctx.fill();
 
-      // Dorsal Fin
+      // Dorsal fin
       ctx.fillStyle = species.accentColor;
       ctx.beginPath();
       ctx.moveTo(-species.sizeX * 0.25, -species.sizeY * 0.78);
@@ -392,7 +410,7 @@ export default function GameScreen({
       ctx.closePath();
       ctx.fill();
 
-      // Main fish body gradient
+      // Body gradient
       const bodyGrad = ctx.createLinearGradient(0, -species.sizeY, 0, species.sizeY);
       bodyGrad.addColorStop(0, species.accentColor);
       bodyGrad.addColorStop(0.45, species.color);
@@ -403,7 +421,7 @@ export default function GameScreen({
       ctx.ellipse(0, 0, species.sizeX, species.sizeY, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Unique Lateral Stripes / Markings
+      // Lateral stripes
       ctx.save();
       ctx.beginPath();
       ctx.ellipse(0, 0, species.sizeX, species.sizeY, 0, 0, Math.PI * 2);
@@ -418,7 +436,6 @@ export default function GameScreen({
       ctx.ellipse(-species.sizeX * 0.42, 0, species.sizeX * 0.12, species.sizeY * 0.85, 0.2, 0, Math.PI * 2);
       ctx.fill();
 
-      // Iridescent top sheen
       ctx.globalAlpha = 0.28;
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
@@ -460,7 +477,6 @@ export default function GameScreen({
       ctx.save();
       ctx.translate(jelly.x, jelly.y);
 
-      // Warning halo
       const halo = ctx.createRadialGradient(0, 0, 6, 0, 0, 38);
       halo.addColorStop(0, 'rgba(244, 63, 94, 0.32)');
       halo.addColorStop(1, 'rgba(244, 63, 94, 0)');
@@ -469,7 +485,6 @@ export default function GameScreen({
       ctx.arc(0, 0, 38, 0, Math.PI * 2);
       ctx.fill();
 
-      // Tentacles
       ctx.strokeStyle = 'rgba(251, 113, 133, 0.78)';
       ctx.lineWidth = 2;
       for (let i = -2; i <= 2; i++) {
@@ -484,7 +499,6 @@ export default function GameScreen({
         ctx.stroke();
       }
 
-      // Bell dome
       const bellGrad = ctx.createLinearGradient(0, -20, 0, 8);
       bellGrad.addColorStop(0, '#f43f5e');
       bellGrad.addColorStop(1, '#fb7185');
@@ -494,7 +508,6 @@ export default function GameScreen({
       ctx.closePath();
       ctx.fill();
 
-      // Inner bioluminescent spots
       ctx.fillStyle = 'rgba(255, 228, 230, 0.75)';
       ctx.beginPath();
       ctx.arc(-5, -5, 2.3, 0, Math.PI * 2);
@@ -517,13 +530,11 @@ export default function GameScreen({
       ctx.arc(0, 0, 26, 0, Math.PI * 2);
       ctx.fill();
 
-      // Shell halves
       ctx.fillStyle = '#0f766e';
       ctx.beginPath();
       ctx.ellipse(0, 7, 15, 6, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Glowing pearl
       const pearlGrad = ctx.createRadialGradient(-3, -3, 1, 0, 0, 10);
       pearlGrad.addColorStop(0, '#ffffff');
       pearlGrad.addColorStop(0.55, '#fef08a');
@@ -543,12 +554,10 @@ export default function GameScreen({
       state.lastTime = now;
 
       const activeSettings = settingsRef.current;
-      const activeDiff =
-        DIFFICULTY_CONFIG[activeSettings.difficulty] || DIFFICULTY_CONFIG.Easy;
       const activeLure =
         LURE_STYLES[activeSettings.lureStyle] || LURE_STYLES.biolum;
 
-      if (!isPausedRef.current && !gameOverRef.current) {
+      if (!isPausedRef.current && missionStatusRef.current === 'playing') {
         state.time += dt;
 
         // Keyboard boat steering
@@ -556,19 +565,18 @@ export default function GameScreen({
         if (state.keys.right) state.targetBoatX += 320 * dt;
         state.targetBoatX = Math.max(85, Math.min(LOGICAL_W - 85, state.targetBoatX));
 
-        // Smooth boat tracking when hook is idle (gentle inertia when reeling)
         const followRate = state.hookState === 'idle' ? 0.14 : 0.04;
         state.boatX += (state.targetBoatX - state.boatX) * followRate;
 
         const hookX = state.boatX + 34;
 
-        // Update fishes
-        const levelSpeedBoost = 1 + (state.level - 1) * 0.09;
+        // Update fishes with difficulty + level speed
+        const levelSpeedBoost = 1 + (level - 1) * 0.06;
         state.fishes.forEach((fish) => {
           fish.x +=
             fish.dir *
             fish.speed *
-            activeDiff.speedMultiplier *
+            stageDiff.speedMultiplier *
             levelSpeedBoost *
             60 *
             dt;
@@ -582,13 +590,6 @@ export default function GameScreen({
         });
 
         // Update jellyfish hazards
-        const targetJellyCount = activeDiff.jellyfishCount;
-        while (state.jellyfishes.length < targetJellyCount) {
-          state.jellyfishes.push(createJellyfishEntity(state.jellyfishes.length));
-        }
-        if (state.jellyfishes.length > targetJellyCount) {
-          state.jellyfishes.length = targetJellyCount;
-        }
         state.jellyfishes.forEach((j) => {
           j.x += j.dir * j.speed * 60 * dt;
           j.y = j.baseY + Math.sin(state.time * 2 + j.phase) * 14;
@@ -616,28 +617,26 @@ export default function GameScreen({
         if (state.hookState === 'idle') {
           state.hookY = restHookY;
         } else if (state.hookState === 'dropping') {
-          state.hookY += activeDiff.dropSpeed * 60 * dt;
+          state.hookY += stageDiff.dropSpeed * 60 * dt;
 
-          // Surface splash check
           if (!state.wasSubmerged && state.hookY > WATER_SURFACE_Y + 6) {
             state.wasSubmerged = true;
             spawnParticles(hookX, WATER_SURFACE_Y + 2, '#bae6fd', 10, 2.4);
           }
 
-          // Check Jellyfish collision first
+          // Check Jellyfish collision
           for (const jelly of state.jellyfishes) {
             const dist = Math.hypot(hookX - jelly.x, state.hookY - jelly.y);
             if (dist < 26) {
               state.hookState = 'retracting';
-              state.combo = 1;
-              state.score = Math.max(0, state.score - 75);
+              const penalty = stageDiff.zapPenalty || 75;
+              state.score = Math.max(0, state.score - penalty);
               state.shakeTime = 0.25;
               scoreRef.current = state.score;
               setScore(state.score);
-              setCombo(1);
-              setLastCatchBanner('⚡ Zapped by Electric Jellyfish! -75 pts · Combo reset');
+              setLastCatchBanner(`⚡ Zapped by Jellyfish! -${penalty} marks`);
               spawnParticles(jelly.x, jelly.y, '#fb7185', 18, 3.6);
-              spawnPopup(jelly.x, jelly.y - 16, '-75 ZAP!', '#fb7185', 16);
+              spawnPopup(jelly.x, jelly.y - 16, `-${penalty} ZAP!`, '#fb7185', 16);
               soundEngine.playZap();
               break;
             }
@@ -652,7 +651,7 @@ export default function GameScreen({
               state.pearlCooldown = 11;
               state.hookState = 'retracting';
               spawnParticles(hookX, state.hookY, '#fde047', 16, 3.2);
-              soundEngine.playCatch(state.combo, true);
+              soundEngine.playCatch(true);
             }
           }
 
@@ -664,11 +663,10 @@ export default function GameScreen({
               const dist = Math.hypot(hookX - fish.x, state.hookY - fish.y);
               if (dist < hitRadius) {
                 state.caughtEntity = fish;
-                state.fishes[i] = createFishEntity(pickNextSpecies(state.level), true);
+                state.fishes[i] = createFishEntity(pickNextSpecies(level), true);
                 state.hookState = 'retracting';
                 spawnParticles(hookX, state.hookY, fish.species.color, 14, 2.8);
                 soundEngine.playCatch(
-                  state.combo,
                   fish.species.rarity === 'Rare' || fish.species.rarity === 'Mythic'
                 );
                 break;
@@ -679,16 +677,11 @@ export default function GameScreen({
           // Bottom miss
           if (state.hookState === 'dropping' && state.hookY >= LOGICAL_H - 28) {
             state.hookState = 'retracting';
-            if (state.combo > 1) {
-              spawnPopup(hookX, LOGICAL_H - 46, 'Combo Lost', '#94a3b8', 13);
-            }
-            state.combo = 1;
-            setCombo(1);
             soundEngine.playMiss();
           }
         } else if (state.hookState === 'retracting') {
           const weightFactor = state.caughtEntity ? 0.85 : 1.1;
-          state.hookY -= activeDiff.retractSpeed * weightFactor * 60 * dt;
+          state.hookY -= stageDiff.retractSpeed * weightFactor * 60 * dt;
 
           if (state.caughtEntity) {
             state.caughtEntity.x = hookX;
@@ -704,64 +697,41 @@ export default function GameScreen({
               spawnParticles(hookX, WATER_SURFACE_Y, '#e0f2fe', 12, 2.8);
 
               if (state.caughtEntity.kind === 'pearl') {
-                const bonusPts = Math.round(250 * activeDiff.scoreMultiplier);
-                state.score += bonusPts;
+                const bonusMarks = Math.round(250 * stageDiff.scoreMultiplier);
+                state.score += bonusMarks;
                 scoreRef.current = state.score;
                 setScore(state.score);
                 setTimeLeft((prev) => prev + 5);
-                spawnPopup(hookX, WATER_SURFACE_Y - 10, `+${bonusPts} & +5s!`, '#fde047', 17);
-                setLastCatchBanner(`✨ Reeled Sunken Pearl! +${bonusPts} pts & +5s Time`);
+                spawnPopup(hookX, WATER_SURFACE_Y - 10, `+${bonusMarks} & +5s!`, '#fde047', 17);
+                setLastCatchBanner(`✨ Sunken Pearl! +${bonusMarks} marks & +5s Time`);
               } else {
                 const sp = state.caughtEntity.species;
-                const comboMult = 1 + Math.min(state.combo - 1, 4) * 0.25;
-                const earned = Math.round(
-                  sp.points * activeDiff.scoreMultiplier * comboMult
-                );
+                const earned = Math.round(sp.points * stageDiff.scoreMultiplier);
                 state.score += earned;
                 state.catches += 1;
-                state.combo += 1;
-                state.bestCombo = Math.max(state.bestCombo, state.combo - 1);
 
                 scoreRef.current = state.score;
                 catchesRef.current = state.catches;
-                bestComboRef.current = state.bestCombo;
 
                 setScore(state.score);
                 setCatches(state.catches);
-                setCombo(state.combo);
-                setRunBestCombo(state.bestCombo);
 
-                const newLevel = Math.floor(state.score / LEVEL_STEP_SCORE) + 1;
-                if (newLevel > state.level) {
-                  state.level = newLevel;
-                  setLevel(newLevel);
-                  soundEngine.playLevelUp();
-                  spawnPopup(
-                    LOGICAL_W / 2,
-                    LOGICAL_H * 0.36,
-                    `DEPTH LEVEL ${newLevel}!`,
-                    '#38bdf8',
-                    22
-                  );
-                }
-
-                const comboTag =
-                  state.combo > 2 ? ` (x${comboMult.toFixed(2).replace(/\.00$/, '')})` : '';
                 spawnPopup(
                   hookX,
                   WATER_SURFACE_Y - 8,
-                  `+${earned}${comboTag}`,
+                  `+${earned}`,
                   sp.color,
                   17
                 );
-                setLastCatchBanner(
-                  `🎣 Caught ${sp.name} · +${earned} pts${
-                    state.combo > 2 ? ` · ${state.combo - 1}x Streak!` : ''
-                  }`
-                );
+                setLastCatchBanner(`🎣 Caught ${sp.name} · +${earned} marks`);
               }
 
               state.caughtEntity = null;
+
+              if (state.score >= targetMarks) {
+                missionStatusRef.current = 'won';
+                setMissionStatus('won');
+              }
             }
           }
         }
@@ -811,7 +781,7 @@ export default function GameScreen({
         );
       }
 
-      // 1. Twilight Sky Band (y = 0 .. WATER_SURFACE_Y)
+      // 1. Twilight Sky Band
       const skyGrad = ctx.createLinearGradient(0, 0, 0, WATER_SURFACE_Y + 8);
       skyGrad.addColorStop(0, '#041226');
       skyGrad.addColorStop(0.65, '#0b2d52');
@@ -819,7 +789,7 @@ export default function GameScreen({
       ctx.fillStyle = skyGrad;
       ctx.fillRect(0, 0, LOGICAL_W, WATER_SURFACE_Y + 8);
 
-      // Moon & atmospheric glow
+      // Moon & glow
       const moonGrad = ctx.createRadialGradient(130, 32, 3, 130, 32, 48);
       moonGrad.addColorStop(0, 'rgba(224, 242, 254, 0.9)');
       moonGrad.addColorStop(0.25, 'rgba(103, 232, 249, 0.3)');
@@ -834,7 +804,6 @@ export default function GameScreen({
       ctx.arc(130, 32, 11, 0, Math.PI * 2);
       ctx.fill();
 
-      // Subtle sky stars
       ctx.fillStyle = 'rgba(224, 242, 254, 0.45)';
       [
         [240, 18],
@@ -857,7 +826,7 @@ export default function GameScreen({
       ctx.fillStyle = waterGrad;
       ctx.fillRect(0, WATER_SURFACE_Y, LOGICAL_W, LOGICAL_H - WATER_SURFACE_Y);
 
-      // 3. Volumetric Underwater Light Rays
+      // 3. Light Rays
       ctx.save();
       [140, 420, 690].forEach((rx, idx) => {
         const sway = Math.sin(state.time * 0.6 + idx * 1.5) * 24;
@@ -876,7 +845,7 @@ export default function GameScreen({
       });
       ctx.restore();
 
-      // 4. Distant Reef Ridge Silhouette
+      // 4. Distant Reef Ridge
       ctx.fillStyle = 'rgba(2, 18, 38, 0.72)';
       ctx.beginPath();
       ctx.moveTo(0, LOGICAL_H);
@@ -888,7 +857,7 @@ export default function GameScreen({
       ctx.closePath();
       ctx.fill();
 
-      // 5. Swaying Seaweed / Kelp along ocean floor
+      // 5. Kelp
       state.kelp.forEach((k) => {
         const sway = Math.sin(state.time * 1.8 + k.phase) * 10;
         ctx.strokeStyle = k.hue;
@@ -930,9 +899,9 @@ export default function GameScreen({
         ctx.stroke();
       });
 
-      // 7. Subtle vertical sightline when hook is idle
+      // 7. Vertical sightline
       const hookX = state.boatX + 34;
-      if (state.hookState === 'idle' && !gameOverRef.current) {
+      if (state.hookState === 'idle' && missionStatusRef.current === 'playing') {
         ctx.save();
         ctx.setLineDash([4, 6]);
         ctx.strokeStyle = 'rgba(103, 232, 249, 0.22)';
@@ -944,14 +913,14 @@ export default function GameScreen({
         ctx.restore();
       }
 
-      // 8. Pearl Bonus & Jellyfish Hazards & Fishes
+      // 8. Pearl, Jellyfish, Fishes
       if (state.pearl) {
         drawPearl(state.pearl, state.time);
       }
       state.jellyfishes.forEach((j) => drawJellyfish(j, state.time));
       state.fishes.forEach((fish) => drawFish(fish, state.time, false));
 
-      // 9. Animated Fishing Boat at Surface
+      // 9. Animated Fishing Boat
       const boatSurfaceY = getWaveHeight(state.boatX, state.time);
       const boatSlope =
         (getWaveHeight(state.boatX + 20, state.time) -
@@ -962,13 +931,11 @@ export default function GameScreen({
       ctx.translate(state.boatX, boatSurfaceY - 4);
       ctx.rotate(boatSlope * 0.75);
 
-      // Hull shadow
       ctx.fillStyle = 'rgba(2, 11, 24, 0.35)';
       ctx.beginPath();
       ctx.ellipse(0, 8, 56, 7, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Hull body
       const hullGrad = ctx.createLinearGradient(0, -14, 0, 10);
       hullGrad.addColorStop(0, '#92400e');
       hullGrad.addColorStop(1, '#451a03');
@@ -981,23 +948,19 @@ export default function GameScreen({
       ctx.closePath();
       ctx.fill();
 
-      // Cyan trim stripe on hull
       ctx.fillStyle = '#38bdf8';
       ctx.fillRect(-51, -8, 105, 2.5);
 
-      // Cabin
       ctx.fillStyle = '#1e293b';
       ctx.beginPath();
       ctx.roundRect(-24, -34, 42, 22, [6, 6, 0, 0]);
       ctx.fill();
 
-      // Cabin roof
       ctx.fillStyle = '#334155';
       ctx.beginPath();
       ctx.roundRect(-28, -37, 50, 5, 3);
       ctx.fill();
 
-      // Glowing Porthole Window
       ctx.fillStyle = '#fde047';
       ctx.beginPath();
       ctx.arc(-4, -23, 5.5, 0, Math.PI * 2);
@@ -1006,7 +969,6 @@ export default function GameScreen({
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      // Fishing rod extending toward hookX
       const rodBend = state.caughtEntity ? 10 : state.hookState === 'dropping' ? 3 : 0;
       ctx.strokeStyle = '#e2e8f0';
       ctx.lineWidth = 2.6;
@@ -1018,7 +980,7 @@ export default function GameScreen({
 
       ctx.restore();
 
-      // 10. Animated Surface Wave Lines (drawn over hull waterline for natural immersion)
+      // 10. Surface Wave Line
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(0, LOGICAL_H);
@@ -1031,7 +993,7 @@ export default function GameScreen({
       ctx.stroke();
       ctx.restore();
 
-      // 11. Fishing Line & Hook (using equipped Lure Style)
+      // 11. Fishing Line & Hook
       const rodTipY = boatSurfaceY - 38 + (state.caughtEntity ? 10 : 0);
       ctx.save();
       ctx.strokeStyle = activeLure.lineColor;
@@ -1041,7 +1003,6 @@ export default function GameScreen({
       ctx.lineTo(hookX, state.hookY);
       ctx.stroke();
 
-      // Hook glow + anchor
       ctx.shadowColor = activeLure.glowColor;
       ctx.shadowBlur = 12;
       ctx.fillStyle = activeLure.hookColor;
@@ -1057,7 +1018,6 @@ export default function GameScreen({
       ctx.stroke();
       ctx.restore();
 
-      // Draw caught fish/pearl attached to hook while reeling up
       if (state.caughtEntity) {
         if (state.caughtEntity.kind === 'pearl') {
           drawPearl(state.caughtEntity, state.time);
@@ -1077,7 +1037,7 @@ export default function GameScreen({
         ctx.restore();
       });
 
-      // 13. Floating Score & Status Popups
+      // 13. Popups
       state.popups.forEach((pop) => {
         ctx.save();
         ctx.globalAlpha = Math.max(0, pop.life);
@@ -1104,7 +1064,7 @@ export default function GameScreen({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [runId]);
+  }, [activeDifficulty, level, targetMarks, runId]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -1112,8 +1072,7 @@ export default function GameScreen({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const comboDisplay = combo > 1 ? `x${(1 + Math.min(combo - 1, 4) * 0.25).toFixed(2).replace(/\.00$/, '')}` : 'x1';
-  const levelProgress = ((score % LEVEL_STEP_SCORE) / LEVEL_STEP_SCORE) * 100;
+  const targetProgress = Math.min(100, Math.round((score / targetMarks) * 100));
   const isAudioMuted = !settings.sfx && !settings.music;
 
   const toggleQuickMute = () => {
@@ -1130,7 +1089,7 @@ export default function GameScreen({
       <div className="glass-panel rounded-[28px] p-4 sm:p-5 relative overflow-hidden">
         <div className="absolute top-0 inset-x-16 h-px bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
 
-        {/* Modern HUD Bar */}
+        {/* Clean Target-Based HUD Bar */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 mb-3.5">
           <div className="flex items-center gap-2">
             <button
@@ -1160,38 +1119,26 @@ export default function GameScreen({
             </button>
           </div>
 
-          {/* Center Stats Pills */}
+          {/* Center Stage & Target Marks Progress */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <div className="glass-subcard px-3.5 py-1.5 rounded-xl flex items-center gap-2">
-              <span className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
-                Score
-              </span>
-              <span className="text-base sm:text-lg font-extrabold text-white font-mono tabular-nums">
-                {score.toLocaleString()}
-              </span>
+            <div className="glass-subcard px-3.5 py-1.5 rounded-xl text-xs font-bold text-cyan-200">
+              {activeDifficulty} · Lv. {level}/{LEVELS_PER_DIFFICULTY}
             </div>
 
-            <div
-              className={`px-3 py-1.5 rounded-xl border text-xs font-extrabold font-mono tabular-nums transition-colors ${
-                combo > 2
-                  ? 'bg-amber-400/20 border-amber-300/45 text-amber-200'
-                  : 'glass-subcard text-cyan-300'
-              }`}
-            >
-              Combo {comboDisplay}
-            </div>
-
-            <div className="glass-subcard px-3.5 py-1.5 rounded-xl flex flex-col justify-center min-w-[92px]">
-              <div className="flex items-center justify-between gap-2 text-xs font-bold">
-                <span className="text-cyan-300">Lv. {level}</span>
-                <span className="text-[10px] text-slate-400">
-                  {Math.round(levelProgress)}%
+            <div className="glass-subcard px-3.5 py-1.5 rounded-xl min-w-[190px] sm:min-w-[230px]">
+              <div className="flex items-center justify-between gap-3 text-xs font-bold">
+                <span className="text-slate-300 uppercase tracking-wider text-[10px]">
+                  Marks Target
+                </span>
+                <span className="font-mono tabular-nums text-white">
+                  <span className="text-cyan-300">{score.toLocaleString()}</span>
+                  <span className="text-slate-400"> / {targetMarks.toLocaleString()}</span>
                 </span>
               </div>
-              <div className="w-full h-1 rounded-full bg-slate-900 mt-1 overflow-hidden">
+              <div className="w-full h-1.5 rounded-full bg-slate-900 mt-1 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-cyan-400 to-teal-300 transition-all duration-300"
-                  style={{ width: `${levelProgress}%` }}
+                  className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-300"
+                  style={{ width: `${targetProgress}%` }}
                 />
               </div>
             </div>
@@ -1200,9 +1147,9 @@ export default function GameScreen({
           {/* Countdown Timer */}
           <div
             className={`px-4 py-1.5 rounded-xl border font-mono font-extrabold text-base sm:text-lg tabular-nums transition-all ${
-              timeLeft <= 10
+              timeLeft <= 8
                 ? 'bg-rose-500/25 border-rose-400/60 text-rose-200 animate-pulse'
-                : timeLeft <= 20
+                : timeLeft <= 15
                 ? 'bg-amber-500/20 border-amber-400/45 text-amber-200'
                 : 'glass-subcard text-white'
             }`}
@@ -1218,14 +1165,13 @@ export default function GameScreen({
             className="w-full h-full block cursor-crosshair touch-none"
           />
 
-          {/* Live Catch Feed / Controls Pill */}
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 max-w-[92%] px-4 py-1.5 rounded-full bg-[#020b18]/75 backdrop-blur-md border border-cyan-300/25 text-[11px] sm:text-xs font-semibold text-cyan-100 pointer-events-none truncate shadow-lg">
             {lastCatchBanner}
           </div>
         </div>
 
         {/* Pause Modal */}
-        {isPaused && !gameOver && (
+        {isPaused && !isEnded && (
           <PauseModal
             onResume={() => setIsPaused(false)}
             onNewGame={restartMission}
@@ -1235,102 +1181,170 @@ export default function GameScreen({
           />
         )}
 
-        {/* Mission Complete Modal */}
-        {gameOver && (
+        {/* Level Complete / Time's Up Modal */}
+        {isEnded && (
           <div className="absolute inset-0 bg-[#020b18]/80 backdrop-blur-md rounded-[28px] flex items-center justify-center p-4 z-20">
             <div className="glass-panel rounded-3xl p-7 w-full max-w-[440px] flex flex-col items-center text-center relative animate-modal-enter">
               <div className="absolute top-0 inset-x-10 h-px bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
 
-              {isNewHighScore ? (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-300/45 text-amber-200 text-xs font-bold uppercase tracking-wider mb-3">
-                  <SparklesIcon className="w-3.5 h-3.5" />
-                  <span>New Personal Best!</span>
-                </div>
-              ) : (
-                <div className="w-12 h-12 rounded-2xl bg-cyan-400/15 border border-cyan-300/30 text-cyan-300 flex items-center justify-center mb-3">
-                  <AnchorHookIcon className="w-6 h-6" />
-                </div>
-              )}
+              {missionStatus === 'won' ? (
+                <>
+                  {isNewHighScore ? (
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-300/45 text-amber-200 text-xs font-bold uppercase tracking-wider mb-3">
+                      <SparklesIcon className="w-3.5 h-3.5" />
+                      <span>New Personal Best!</span>
+                    </div>
+                  ) : (
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-400/15 border border-emerald-300/35 text-emerald-300 flex items-center justify-center mb-3">
+                      <SparklesIcon className="w-6 h-6" />
+                    </div>
+                  )}
 
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-1">
-                Mission Complete
-              </h2>
-              <p className="text-xs text-slate-400 mb-5">
-                Expedition log recorded on {settings.difficulty} currents.
-              </p>
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-1">
+                    {!nextStage
+                      ? 'All 18 Levels Complete!'
+                      : level === LEVELS_PER_DIFFICULTY
+                      ? `${activeDifficulty} Mode Cleared!`
+                      : `Level ${level} Complete!`}
+                  </h2>
+                  <p className="text-xs text-slate-300/80 mb-5">
+                    {!nextStage
+                      ? 'You conquered Easy, Normal, and Hard modes!'
+                      : nextStage.difficulty !== activeDifficulty
+                      ? `Unlocked ${nextStage.difficulty} Mode — Level 1`
+                      : `Target reached on ${activeDifficulty} currents`}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="w-12 h-12 rounded-2xl bg-rose-400/15 border border-rose-300/35 text-rose-300 flex items-center justify-center mb-3">
+                    <AnchorHookIcon className="w-6 h-6" />
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white mb-1">
+                    Time&apos;s Up!
+                  </h2>
+                  <p className="text-xs text-slate-300/80 mb-5">
+                    Collect {targetMarks.toLocaleString()} marks before time runs out on {activeDifficulty} Lv. {level}.
+                  </p>
+                </>
+              )}
 
               <div className="glass-subcard w-full rounded-2xl p-4 mb-4">
                 <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
-                  Final Score
+                  Marks Collected
                 </div>
-                <div className="text-4xl font-extrabold text-cyan-300 font-mono tabular-nums mt-0.5">
+                <div className="text-3xl sm:text-4xl font-extrabold text-cyan-300 font-mono tabular-nums mt-0.5">
                   {score.toLocaleString()}
+                  <span className="text-base text-slate-400 font-semibold">
+                    {' '}/ {targetMarks.toLocaleString()}
+                  </span>
                 </div>
-                <div className="text-[11px] text-slate-400 mt-1">
-                  Personal Best: {Math.max(bestScore, score).toLocaleString()} pts
-                </div>
+                {missionStatus === 'lost' && (
+                  <div className="text-[11px] text-rose-300 mt-1">
+                    Short by {Math.max(0, targetMarks - score).toLocaleString()} marks
+                  </div>
+                )}
               </div>
 
-              <div className="grid grid-cols-3 gap-2.5 w-full mb-6">
+              <div className="grid grid-cols-2 gap-2.5 w-full mb-6">
+                <div className="glass-subcard rounded-xl p-2.5">
+                  <div className="text-[10px] uppercase tracking-wider text-slate-400">
+                    Time Left
+                  </div>
+                  <div className="text-base font-extrabold text-white tabular-nums">
+                    {formatTime(timeLeft)}
+                  </div>
+                </div>
                 <div className="glass-subcard rounded-xl p-2.5">
                   <div className="text-[10px] uppercase tracking-wider text-slate-400">
                     Catches
                   </div>
-                  <div className="text-base font-extrabold text-white tabular-nums">
-                    {catches}
-                  </div>
-                </div>
-                <div className="glass-subcard rounded-xl p-2.5">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400">
-                    Peak Streak
-                  </div>
-                  <div className="text-base font-extrabold text-amber-300 tabular-nums">
-                    {runBestCombo}x
-                  </div>
-                </div>
-                <div className="glass-subcard rounded-xl p-2.5">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400">
-                    Depth Lv.
-                  </div>
                   <div className="text-base font-extrabold text-cyan-300 tabular-nums">
-                    {level}
+                    {catches}
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2.5 w-full">
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playClick();
-                    restartMission();
-                  }}
-                  className="btn-ocean-primary flex-1 h-11 rounded-xl flex items-center justify-center gap-2 text-sm cursor-pointer"
-                >
-                  <PlayIcon className="w-4 h-4" />
-                  <span>Hunt Again</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playClick();
-                    onOpenLeaderboard();
-                  }}
-                  className="btn-ocean-secondary h-11 px-4 rounded-xl flex items-center justify-center gap-1.5 text-sm font-semibold cursor-pointer"
-                >
-                  <TrophyIcon className="w-4 h-4 text-amber-300" />
-                  <span>Ranks</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playClick();
-                    onReturnHome();
-                  }}
-                  className="btn-ocean-secondary h-11 px-4 rounded-xl flex items-center justify-center text-sm font-semibold cursor-pointer"
-                >
-                  Hub
-                </button>
+              <div className="flex flex-col gap-2.5 w-full">
+                {missionStatus === 'won' ? (
+                  nextStage ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playClick();
+                        onAdvanceStage(nextStage);
+                      }}
+                      className="btn-ocean-primary w-full h-11 rounded-xl flex items-center justify-center gap-2 text-sm cursor-pointer"
+                    >
+                      <PlayIcon className="w-4 h-4" />
+                      <span>
+                        {nextStage.difficulty !== activeDifficulty
+                          ? `Start ${nextStage.difficulty} Lv. 1`
+                          : `Next Level (Lv. ${nextStage.level})`}
+                      </span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playClick();
+                        onAdvanceStage({ difficulty: 'Easy', level: 1 });
+                      }}
+                      className="btn-ocean-primary w-full h-11 rounded-xl flex items-center justify-center gap-2 text-sm cursor-pointer"
+                    >
+                      <PlayIcon className="w-4 h-4" />
+                      <span>Play Again from Easy Lv. 1</span>
+                    </button>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClick();
+                      restartMission();
+                    }}
+                    className="btn-ocean-primary w-full h-11 rounded-xl flex items-center justify-center gap-2 text-sm cursor-pointer"
+                  >
+                    <PlayIcon className="w-4 h-4" />
+                    <span>Retry Level {level}</span>
+                  </button>
+                )}
+
+                <div className="flex gap-2.5 w-full">
+                  {missionStatus === 'won' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playClick();
+                        restartMission();
+                      }}
+                      className="btn-ocean-secondary flex-1 h-10 rounded-xl flex items-center justify-center text-xs sm:text-sm font-semibold cursor-pointer"
+                    >
+                      Replay
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClick();
+                      onOpenLeaderboard();
+                    }}
+                    className="btn-ocean-secondary flex-1 h-10 rounded-xl flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold cursor-pointer"
+                  >
+                    <TrophyIcon className="w-4 h-4 text-amber-300" />
+                    <span>Top Hunters</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClick();
+                      onReturnHome();
+                    }}
+                    className="btn-ocean-secondary flex-1 h-10 rounded-xl flex items-center justify-center text-xs sm:text-sm font-semibold cursor-pointer"
+                  >
+                    Menu
+                  </button>
+                </div>
               </div>
             </div>
           </div>

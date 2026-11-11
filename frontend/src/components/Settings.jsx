@@ -93,7 +93,7 @@ export default function Settings({ settings, onUpdateSettings, onReturnHome, ret
                 checked={settings.sfx}
                 onChange={(val) => updateField('sfx', val)}
                 label="Arcade Sound Effects"
-                description="Line cast splashes, combo chimes, level ups, and alerts"
+                description="Line cast splashes, catch chimes, level ups, and alerts"
               />
             </div>
           </div>

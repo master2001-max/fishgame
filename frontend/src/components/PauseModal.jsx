@@ -7,7 +7,7 @@ import {
   SlidersIcon,
   SparklesIcon,
 } from './Icons';
-import { DIFFICULTY_CONFIG, LURE_STYLES } from '../utils/gameConfig';
+import { LURE_STYLES } from '../utils/gameConfig';
 import { soundEngine } from '../utils/sound';
 
 export default function PauseModal({
@@ -144,29 +144,6 @@ export default function PauseModal({
                 >
                   {settings.sfx ? 'ON' : 'OFF'}
                 </button>
-              </div>
-
-              <div className="glass-subcard rounded-xl p-3">
-                <div className="text-xs font-semibold text-slate-200 mb-2">Difficulty</div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {Object.keys(DIFFICULTY_CONFIG).map((diff) => (
-                    <button
-                      key={diff}
-                      type="button"
-                      onClick={() => {
-                        soundEngine.playClick();
-                        onUpdateSettings({ ...settings, difficulty: diff });
-                      }}
-                      className={`py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
-                        settings.difficulty === diff
-                          ? 'bg-cyan-400 text-slate-950'
-                          : 'bg-slate-900/70 text-slate-300 hover:bg-slate-800'
-                      }`}
-                    >
-                      {diff}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <div className="glass-subcard rounded-xl p-3">

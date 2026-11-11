@@ -7,13 +7,17 @@ import Leaderboard from './components/Leaderboard';
 import Settings from './components/Settings';
 import OceanBackdrop from './components/OceanBackdrop';
 import {
+  getNextIncompleteLevel,
+  loadProgress,
   loadSettings,
   loadStats,
   loadUser,
+  markLevelCompleted,
   recordGameStats,
   saveSettings,
   saveUser,
 } from './utils/storage';
+import { getNextStage, normalizeDifficulty } from './utils/gameConfig';
 import { soundEngine } from './utils/sound';
 
 export default function App() {
@@ -23,6 +27,14 @@ export default function App() {
   );
   const [settings, setSettings] = useState(() => loadSettings());
   const [stats, setStats] = useState(() => loadStats());
+  const [progress, setProgress] = useState(() => loadProgress());
+  const [selectedLevel, setSelectedLevel] = useState(() =>
+    getNextIncompleteLevel(loadProgress(), loadSettings().difficulty)
+  );
+  const [activeStage, setActiveStage] = useState(() => ({
+    difficulty: loadSettings().difficulty,
+    level: getNextIncompleteLevel(loadProgress(), loadSettings().difficulty),
+  }));
   const [audioUnlocked, setAudioUnlocked] = useState(false);
 
   // Sync audio preferences
@@ -56,23 +68,82 @@ export default function App() {
 
   const handleNavigation = (destination) => {
     unlockAudioIfNeeded();
+    if (destination === 'game') {
+      setActiveStage({
+        difficulty: normalizeDifficulty(settings.difficulty),
+        level: selectedLevel,
+      });
+    }
     setCurrentScreen(destination);
   };
 
   const handleUpdateSettings = useCallback(
     (nextSettings) => {
       unlockAudioIfNeeded();
-      setSettings(nextSettings);
-      saveSettings(nextSettings);
+      const prevDiff = normalizeDifficulty(settings.difficulty);
+      const nextDiff = normalizeDifficulty(nextSettings.difficulty);
+      const normalized = { ...nextSettings, difficulty: nextDiff };
+      setSettings(normalized);
+      saveSettings(normalized);
+      if (nextDiff !== prevDiff) {
+        setSelectedLevel(getNextIncompleteLevel(progress, nextDiff));
+      }
     },
-    [unlockAudioIfNeeded]
+    [progress, settings.difficulty, unlockAudioIfNeeded]
   );
 
-  const handleMissionComplete = useCallback((summary) => {
-    const result = recordGameStats(summary);
-    setStats(result.stats);
-    return result;
+  const handleSelectDifficulty = useCallback(
+    (difficulty) => {
+      unlockAudioIfNeeded();
+      const nextDiff = normalizeDifficulty(difficulty);
+      const nextSettings = { ...settings, difficulty: nextDiff };
+      setSettings(nextSettings);
+      saveSettings(nextSettings);
+      setSelectedLevel(getNextIncompleteLevel(progress, nextDiff));
+    },
+    [progress, settings, unlockAudioIfNeeded]
+  );
+
+  const handleMissionComplete = useCallback(
+    ({ difficulty, level, score, catches, won }) => {
+      const result = recordGameStats({ score, catches });
+      setStats(result.stats);
+
+      if (won) {
+        const nextProgress = markLevelCompleted(difficulty, level);
+        setProgress(nextProgress);
+
+        const next = getNextStage(difficulty, level);
+        if (next) {
+          setSettings((prev) => {
+            const updated = { ...prev, difficulty: next.difficulty };
+            saveSettings(updated);
+            return updated;
+          });
+          setSelectedLevel(next.level);
+        }
+      }
+
+      return result;
+    },
+    []
+  );
+
+  const handleAdvanceStage = useCallback((nextStage) => {
+    const nextDiff = normalizeDifficulty(nextStage.difficulty);
+    setSettings((prev) => {
+      const updated = { ...prev, difficulty: nextDiff };
+      saveSettings(updated);
+      return updated;
+    });
+    setSelectedLevel(nextStage.level);
+    setActiveStage({ difficulty: nextDiff, level: nextStage.level });
   }, []);
+
+  const gameSettings = {
+    ...settings,
+    difficulty: activeStage.difficulty,
+  };
 
   return (
     <main className="relative min-h-screen w-full overflow-x-hidden flex items-center justify-center">
@@ -96,8 +167,11 @@ export default function App() {
         {currentScreen === 'menu' && (
           <MainMenu
             username={currentUser}
-            stats={stats}
             settings={settings}
+            selectedLevel={selectedLevel}
+            progress={progress}
+            onSelectDifficulty={handleSelectDifficulty}
+            onSelectLevel={setSelectedLevel}
             onNavigate={handleNavigation}
             onLogout={handleLogout}
           />
@@ -105,10 +179,13 @@ export default function App() {
 
         {currentScreen === 'game' && (
           <GameScreen
-            settings={settings}
+            key={`${activeStage.difficulty}-${activeStage.level}`}
+            settings={gameSettings}
+            level={activeStage.level}
             bestScore={stats.bestScore}
             onUpdateSettings={handleUpdateSettings}
             onMissionComplete={handleMissionComplete}
+            onAdvanceStage={handleAdvanceStage}
             onReturnHome={() => setCurrentScreen('menu')}
             onOpenLeaderboard={() => setCurrentScreen('leaderboard')}
           />

@@ -97,38 +97,94 @@ export const FISH_SPECIES = [
   },
 ];
 
+export const DIFFICULTY_ORDER = ['Easy', 'Normal', 'Hard'];
+export const LEVELS_PER_DIFFICULTY = 6;
+
 export const DIFFICULTY_CONFIG = {
   Easy: {
+    name: 'Easy',
     label: 'Calm Reef',
-    badge: '1.0x Score',
-    description: 'Gentle currents, no jellyfish hazards, relaxed pace.',
-    speedMultiplier: 0.9,
-    scoreMultiplier: 1.0,
+    duration: 90,
+    timeLabel: '1.5 min',
+    speedLabel: 'Slow',
+    marksLabel: 'Low Marks',
+    badge: '1.5m · Slow',
+    description: '1.5 min timer, slow fish speed, and low target marks.',
+    speedMultiplier: 0.65,
+    scoreMultiplier: 0.5,
     jellyfishCount: 0,
-    dropSpeed: 7.5,
-    retractSpeed: 8.5,
+    zapPenalty: 0,
+    dropSpeed: 7.4,
+    retractSpeed: 8.4,
+    fishCount: 8,
+    levelTargets: [350, 500, 650, 850, 1050, 1250],
   },
-  Medium: {
+  Normal: {
+    name: 'Normal',
     label: 'Open Trench',
-    badge: '1.25x Score',
-    description: 'Brisk ocean currents, 1 electric jellyfish patrol.',
-    speedMultiplier: 1.15,
-    scoreMultiplier: 1.25,
+    duration: 60,
+    timeLabel: '1 min',
+    speedLabel: 'Average Speed',
+    marksLabel: 'Average Marks',
+    badge: '1m · Average',
+    description: '1 min timer, average fish speed, average marks, 1 jellyfish.',
+    speedMultiplier: 1.0,
+    scoreMultiplier: 1.0,
     jellyfishCount: 1,
+    zapPenalty: 75,
     dropSpeed: 8.2,
     retractSpeed: 9.2,
+    fishCount: 8,
+    levelTargets: [800, 1100, 1400, 1700, 2000, 2300],
   },
   Hard: {
+    name: 'Hard',
     label: 'Abyssal Surge',
-    badge: '1.5x Score',
-    description: 'Fast deep-sea predators, 2 jellyfish hazards, high rewards.',
-    speedMultiplier: 1.4,
-    scoreMultiplier: 1.5,
+    duration: 30,
+    timeLabel: '30s',
+    speedLabel: 'Fast Speed',
+    marksLabel: 'High Marks',
+    badge: '30s · Fast',
+    description: '30s timer, fast fish speed, high marks, 2 jellyfish hazards.',
+    speedMultiplier: 1.45,
+    scoreMultiplier: 2.0,
     jellyfishCount: 2,
-    dropSpeed: 8.8,
-    retractSpeed: 9.8,
+    zapPenalty: 100,
+    dropSpeed: 9.5,
+    retractSpeed: 10.5,
+    fishCount: 9,
+    levelTargets: [1400, 1800, 2150, 2500, 2850, 3200],
   },
 };
+
+export function normalizeDifficulty(difficulty) {
+  if (difficulty === 'Medium' || difficulty === 'Normal') return 'Normal';
+  if (difficulty === 'Hard') return 'Hard';
+  return 'Easy';
+}
+
+export function getLevelTargetMarks(difficulty, level) {
+  const safeDiff = normalizeDifficulty(difficulty);
+  const conf = DIFFICULTY_CONFIG[safeDiff];
+  const idx = Math.max(0, Math.min(LEVELS_PER_DIFFICULTY - 1, (level || 1) - 1));
+  return conf.levelTargets[idx];
+}
+
+export function getNextStage(difficulty, level) {
+  const safeDiff = normalizeDifficulty(difficulty);
+  const safeLevel = Math.max(1, Math.min(LEVELS_PER_DIFFICULTY, level || 1));
+
+  if (safeLevel < LEVELS_PER_DIFFICULTY) {
+    return { difficulty: safeDiff, level: safeLevel + 1 };
+  }
+  if (safeDiff === 'Easy') {
+    return { difficulty: 'Normal', level: 1 };
+  }
+  if (safeDiff === 'Normal') {
+    return { difficulty: 'Hard', level: 1 };
+  }
+  return null;
+}
 
 export const LURE_STYLES = {
   steel: {

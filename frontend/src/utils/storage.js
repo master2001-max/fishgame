@@ -1,9 +1,15 @@
-import { SEEDED_HUNTERS, getHunterRankTitle } from './gameConfig.js';
+import {
+  LEVELS_PER_DIFFICULTY,
+  SEEDED_HUNTERS,
+  getHunterRankTitle,
+  normalizeDifficulty,
+} from './gameConfig.js';
 
 const STORAGE_KEYS = {
   SETTINGS: 'fishcatcher_settings_v2',
   USER: 'fishcatcher_user_v2',
   STATS: 'fishcatcher_stats_v2',
+  PROGRESS: 'fishcatcher_progress_v1',
 };
 
 export const DEFAULT_SETTINGS = {
@@ -17,7 +23,14 @@ export const DEFAULT_STATS = {
   bestScore: 0,
   totalCatches: 0,
   gamesPlayed: 0,
-  bestCombo: 0,
+};
+
+export const DEFAULT_PROGRESS = {
+  completed: {
+    Easy: [],
+    Normal: [],
+    Hard: [],
+  },
 };
 
 function safeRead(key, fallback) {
@@ -39,11 +52,18 @@ function safeWrite(key, value) {
 }
 
 export function loadSettings() {
-  return safeRead(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+  const loaded = safeRead(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS);
+  return {
+    ...loaded,
+    difficulty: normalizeDifficulty(loaded.difficulty),
+  };
 }
 
 export function saveSettings(settings) {
-  safeWrite(STORAGE_KEYS.SETTINGS, settings);
+  safeWrite(STORAGE_KEYS.SETTINGS, {
+    ...settings,
+    difficulty: normalizeDifficulty(settings.difficulty),
+  });
 }
 
 export function loadUser() {
@@ -67,22 +87,69 @@ export function saveUser(username) {
 }
 
 export function loadStats() {
-  return safeRead(STORAGE_KEYS.STATS, DEFAULT_STATS);
+  const loaded = safeRead(STORAGE_KEYS.STATS, DEFAULT_STATS);
+  return {
+    bestScore: Number(loaded.bestScore) || 0,
+    totalCatches: Number(loaded.totalCatches) || 0,
+    gamesPlayed: Number(loaded.gamesPlayed) || 0,
+  };
 }
 
-export function recordGameStats({ score, catches, bestCombo }) {
+export function recordGameStats({ score, catches }) {
   const prev = loadStats();
   const next = {
     bestScore: Math.max(prev.bestScore, score),
     totalCatches: prev.totalCatches + catches,
     gamesPlayed: prev.gamesPlayed + 1,
-    bestCombo: Math.max(prev.bestCombo, bestCombo),
   };
   safeWrite(STORAGE_KEYS.STATS, next);
   return {
     stats: next,
     isNewHighScore: score > prev.bestScore && score > 0,
   };
+}
+
+export function loadProgress() {
+  const raw = safeRead(STORAGE_KEYS.PROGRESS, DEFAULT_PROGRESS);
+  const completed = raw.completed || {};
+  const sanitizeList = (list) =>
+    Array.isArray(list)
+      ? [...new Set(list.filter((n) => Number.isInteger(n) && n >= 1 && n <= LEVELS_PER_DIFFICULTY))]
+      : [];
+  return {
+    completed: {
+      Easy: sanitizeList(completed.Easy),
+      Normal: sanitizeList(completed.Normal),
+      Hard: sanitizeList(completed.Hard),
+    },
+  };
+}
+
+export function markLevelCompleted(difficulty, level) {
+  const safeDiff = normalizeDifficulty(difficulty);
+  const safeLevel = Math.max(1, Math.min(LEVELS_PER_DIFFICULTY, level));
+  const prev = loadProgress();
+  const list = prev.completed[safeDiff] || [];
+  if (list.includes(safeLevel)) {
+    return prev;
+  }
+  const next = {
+    completed: {
+      ...prev.completed,
+      [safeDiff]: [...list, safeLevel].sort((a, b) => a - b),
+    },
+  };
+  safeWrite(STORAGE_KEYS.PROGRESS, next);
+  return next;
+}
+
+export function getNextIncompleteLevel(progress, difficulty) {
+  const safeDiff = normalizeDifficulty(difficulty);
+  const completed = progress?.completed?.[safeDiff] || [];
+  for (let lv = 1; lv <= LEVELS_PER_DIFFICULTY; lv++) {
+    if (!completed.includes(lv)) return lv;
+  }
+  return 1;
 }
 
 export function getRankedLeaderboard(currentUsername, currentBestScore) {
