@@ -12,7 +12,7 @@
 
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
-import { getFirebaseAuth } from '../config/firebase.js';
+import { getFirebaseAuth, getServiceAccount } from '../config/firebase.js';
 
 export async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization || '';
@@ -24,26 +24,50 @@ export async function requireAuth(req, res, next) {
     });
   }
 
-  // 1. Verify with Firebase Admin SDK
+  // 1. Check if it's an Express-signed JWT (HS256 via env.JWT_SECRET)
   try {
-    const auth = getFirebaseAuth();
-    if (!auth) {
-      throw new Error('Firebase Auth is not initialized');
-    }
-    const decodedToken = await auth.verifyIdToken(token);
-    req.userId = decodedToken.uid;
-    req.userEmail = decodedToken.email;
+    const payload = jwt.verify(token, env.JWT_SECRET);
+    req.userId = payload.userId;
+    req.userName = payload.name;
     return next();
   } catch {
-    // 2. Fallback to signed JWT verification if custom token / test token
-    try {
-      const payload = jwt.verify(token, env.JWT_SECRET);
-      req.userId = payload.userId;
-      return next();
-    } catch {
-      return res.status(401).json({
-        error: 'Invalid or expired authentication token. Please sign in again.',
-      });
-    }
+    // Proceed to Firebase token verification
   }
+
+  // 2. Check if it's a Firebase ID Token (RS256 via Google Public Keys)
+  try {
+    const auth = getFirebaseAuth();
+    if (auth) {
+      const decodedToken = await auth.verifyIdToken(token);
+      req.userId = decodedToken.uid;
+      req.userEmail = decodedToken.email;
+      return next();
+    }
+  } catch {
+    // Proceed to Firebase Custom Token verification
+  }
+
+  // 3. Fallback: Firebase Custom Token (RS256 via Service Account key)
+  try {
+    const decoded = jwt.decode(token);
+    if (
+      decoded &&
+      decoded.uid &&
+      decoded.aud === 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit'
+    ) {
+      const sa = getServiceAccount();
+      const privateKey = sa?.private_key || sa?.privateKey || env.FIREBASE?.privateKey;
+      if (privateKey) {
+        const verified = jwt.verify(token, privateKey, { algorithms: ['RS256'] });
+        req.userId = verified.uid;
+        return next();
+      }
+    }
+  } catch {
+    // All verification strategies exhausted
+  }
+
+  return res.status(401).json({
+    error: 'Invalid or expired authentication token. Please sign in again.',
+  });
 }

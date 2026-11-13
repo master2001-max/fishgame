@@ -13,8 +13,8 @@
 | Metrics | Value |
 | :--- | :--- |
 | **Total Test Suites** | 5 |
-| **Total Tests Executed** | 20 |
-| **Tests Passed** | 20 (100%) |
+| **Total Tests Executed** | 22 |
+| **Tests Passed** | 22 (100%) |
 | **Tests Failed** | 0 |
 | **Status** | **ALL TESTS PASSED (100% SUCCESS RATE)** |
 
@@ -30,10 +30,12 @@ Verifies HTTP routing, Helmet security headers, Zod input validation, and 401/40
 - [x] `GET /api/non-existent-route` should return 404 — **PASS**
 
 ### Suite 2: Authentication Middleware (`tests/authMiddleware.test.js`)
-Verifies Bearer token extraction, invalid token rejection, and header enforcement.
+Verifies Bearer token extraction, invalid token rejection, header enforcement, Express-signed JWT sessions, and Firebase Custom Token fallback via Service Account RS256 signature verification.
 - [x] Should return 401 if Authorization header is missing — **PASS**
 - [x] Should return 401 if scheme is not Bearer — **PASS**
 - [x] Should return 401 if token is invalid or malformed — **PASS**
+- [x] Should authenticate valid Express-signed JWT sessions — **PASS**
+- [x] Should authenticate valid Firebase Custom tokens via Service Account verification — **PASS**
 
 ### Suite 3: PuzzleService - Marc Conrad Fish API Interoperability (`tests/puzzleService.test.js`)
 Verifies live external web service integration, single-use token isolation, and anti-cheat answer verification.

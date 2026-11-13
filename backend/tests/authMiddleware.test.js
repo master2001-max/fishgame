@@ -7,6 +7,9 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
+import jwt from 'jsonwebtoken';
+import { env } from '../src/config/env.js';
+import { getFirebaseAuth } from '../src/config/firebase.js';
 import { requireAuth } from '../src/middleware/authMiddleware.js';
 
 function createMockRes() {
@@ -65,5 +68,35 @@ describe('requireAuth Middleware', () => {
     assert.strictEqual(nextCalled, false);
     assert.strictEqual(res.statusCode, 401);
     assert.match(res.body.error, /Invalid or expired/);
+  });
+
+  it('should authenticate valid Express-signed JWT sessions', async () => {
+    const validToken = jwt.sign({ userId: 'hunter_test_99' }, env.JWT_SECRET);
+    const req = { headers: { authorization: `Bearer ${validToken}` } };
+    const res = createMockRes();
+    let nextCalled = false;
+
+    await requireAuth(req, res, () => {
+      nextCalled = true;
+    });
+
+    assert.strictEqual(nextCalled, true);
+    assert.strictEqual(req.userId, 'hunter_test_99');
+  });
+
+  it('should authenticate valid Firebase Custom tokens via Service Account verification', async () => {
+    const auth = getFirebaseAuth();
+    if (!auth) return;
+    const customToken = await auth.createCustomToken('hunter_firebase_custom_55');
+    const req = { headers: { authorization: `Bearer ${customToken}` } };
+    const res = createMockRes();
+    let nextCalled = false;
+
+    await requireAuth(req, res, () => {
+      nextCalled = true;
+    });
+
+    assert.strictEqual(nextCalled, true);
+    assert.strictEqual(req.userId, 'hunter_firebase_custom_55');
   });
 });

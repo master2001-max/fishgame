@@ -20,6 +20,7 @@ import { env, BACKEND_ROOT } from './env.js';
 let firebaseApp = null;
 let firestoreDb = null;
 let firebaseAuth = null;
+let loadedServiceAccount = null;
 
 /**
  * Initializes the Firebase Admin SDK using one of three credential options:
@@ -57,6 +58,7 @@ export function initFirebase() {
       if (fs.existsSync(testPath)) {
         try {
           const serviceAccount = JSON.parse(fs.readFileSync(testPath, 'utf8'));
+          loadedServiceAccount = serviceAccount;
           credential = cert(serviceAccount);
           break;
         } catch (e) {
@@ -67,6 +69,12 @@ export function initFirebase() {
 
     // Strategy 2: Check environment variables
     if (!credential && env.FIREBASE.clientEmail && env.FIREBASE.privateKey) {
+      loadedServiceAccount = {
+        projectId: env.FIREBASE.projectId,
+        clientEmail: env.FIREBASE.clientEmail,
+        privateKey: env.FIREBASE.privateKey,
+        private_key: env.FIREBASE.privateKey,
+      };
       credential = cert({
         projectId: env.FIREBASE.projectId,
         clientEmail: env.FIREBASE.clientEmail,
@@ -112,4 +120,11 @@ export function getFirebaseAuth() {
     initFirebase();
   }
   return firebaseAuth;
+}
+
+export function getServiceAccount() {
+  if (!loadedServiceAccount) {
+    initFirebase();
+  }
+  return loadedServiceAccount;
 }

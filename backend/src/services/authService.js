@@ -68,7 +68,6 @@ export const authService = {
           displayName: cleanName,
         });
         userId = fbUser.uid;
-        token = await auth.createCustomToken(userId);
       } else {
         throw new AppError('Password must be at least 6 characters.', 400);
       }
@@ -150,9 +149,7 @@ export const authService = {
       }
     }
 
-    const token = env.DB_DRIVER === 'firestore'
-      ? await getFirebaseAuth().createCustomToken(user.id)
-      : signJwt(user);
+    const token = signJwt(user);
 
     return {
       token,
