@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "db:view": "node scripts/viewDb.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
