@@ -1,27 +1,37 @@
+/**
+ * Authentication Controller
+ *
+ * Location: backend/src/controllers/authController.js
+ * Where it fits: HTTP interface layer. Bridges routes to authService.
+ *
+ * Why: Pure controller with Single Responsibility (handling HTTP status codes, request extraction,
+ * and passing errors to the global error middleware via next(err)).
+ */
+
 import { authService } from '../services/authService.js';
 
 export const authController = {
-  register(req, res, next) {
+  async register(req, res, next) {
     try {
-      const result = authService.register(req.body || {});
+      const result = await authService.register(req.body || {});
       res.status(201).json(result);
     } catch (err) {
       next(err);
     }
   },
 
-  login(req, res, next) {
+  async login(req, res, next) {
     try {
-      const result = authService.login(req.body || {});
+      const result = await authService.login(req.body || {});
       res.json(result);
     } catch (err) {
       next(err);
     }
   },
 
-  me(req, res, next) {
+  async me(req, res, next) {
     try {
-      const state = authService.getProfile(req.userId);
+      const state = await authService.getProfile(req.userId);
       res.json({ state });
     } catch (err) {
       next(err);

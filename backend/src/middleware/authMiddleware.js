@@ -1,7 +1,20 @@
+/**
+ * Authentication Middleware (Firebase ID Token Verification)
+ *
+ * Location: backend/src/middleware/authMiddleware.js
+ * Where it fits: Security boundary. Protects all /api/game/* and private user routes.
+ *
+ * Why: The React client sends a cryptographically signed Firebase ID token in the
+ * 'Authorization: Bearer <token>' header. This middleware verifies the token with the
+ * Firebase Admin SDK to ensure the user is genuinely authenticated, extracting their UID
+ * and attaching it to `req.userId` for downstream controllers.
+ */
+
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
+import { getFirebaseAuth } from '../config/firebase.js';
 
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization || '';
   const [scheme, token] = authHeader.split(' ');
 
@@ -11,6 +24,25 @@ export function requireAuth(req, res, next) {
     });
   }
 
+  // 1. Firebase ID Token Verification (Production Firestore Mode)
+  if (env.DB_DRIVER === 'firestore') {
+    try {
+      const auth = getFirebaseAuth();
+      if (!auth) {
+        throw new Error('Firebase Auth is not initialized');
+      }
+      const decodedToken = await auth.verifyIdToken(token);
+      req.userId = decodedToken.uid;
+      req.userEmail = decodedToken.email;
+      return next();
+    } catch (err) {
+      return res.status(401).json({
+        error: 'Invalid or expired Firebase authentication token. Please sign in again.',
+      });
+    }
+  }
+
+  // 2. Legacy JWT Fallback (SQLite Mode)
   try {
     const payload = jwt.verify(token, env.JWT_SECRET);
     req.userId = payload.userId;

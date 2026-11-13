@@ -1,4 +1,16 @@
+/**
+ * Game Service (Business Rules & Game State Management)
+ *
+ * Location: backend/src/services/gameService.js
+ * Where it fits: Core Domain Layer. Coordinates game logic, mission completions, and leaderboards.
+ *
+ * Why: Keeps game rules independent of both HTTP controllers and the database.
+ * Enforces sequential level completion, performs anti-cheat score checks via scoreValidator,
+ * and builds unified client state payloads.
+ */
+
 import { userRepository } from '../repositories/userRepository.js';
+import { scoreValidator } from './scoreValidator.js';
 import { AppError } from '../utils/appError.js';
 
 export const DIFFICULTIES = ['Easy', 'Normal', 'Hard'];
@@ -40,7 +52,7 @@ export const gameService = {
 
     return {
       user: {
-        id: user.id,
+        id: String(user.id),
         name: user.name,
         email: user.email,
         difficulty: activeDifficulty,
@@ -63,19 +75,32 @@ export const gameService = {
     };
   },
 
-  completeMission(userId, { difficulty, level, score, catches, won }) {
-    const user = userRepository.findById(userId);
-    if (!user) throw new AppError('User not found.', 404);
+  /**
+   * Completes a mission: runs anti-cheat validation, enforces level progression,
+   * updates stats, and updates the leaderboard.
+   */
+  async completeMission(userId, { difficulty, level, score, catches, won }) {
+    const user = await userRepository.findById(userId);
+    if (!user) throw new AppError('Hunter account not found.', 404);
 
     const safeDifficulty = normalizeDifficulty(difficulty);
     const numericLevel = Number(level);
     const safeScore = Math.max(0, Math.floor(Number(score) || 0));
     const safeCatches = Math.max(0, Math.floor(Number(catches) || 0));
 
+    // 1. Anti-Cheat Score Validation
+    scoreValidator.validateMissionOutcome({
+      difficulty: safeDifficulty,
+      level: numericLevel,
+      score: safeScore,
+      catches: safeCatches,
+      won: Boolean(won),
+    });
+
     const progress = normalizeProgress(user.progress);
     const diffProgress = progress[safeDifficulty];
 
-    // Enforce level-by-level progression: player cannot skip ahead
+    // 2. Enforce sequential progression (cannot skip ahead to locked levels)
     if (!Number.isInteger(numericLevel) || numericLevel !== diffProgress.currentLevel) {
       throw new AppError(
         `Must play ${safeDifficulty} sequentially. Current level is ${diffProgress.currentLevel}.`,
@@ -95,7 +120,7 @@ export const gameService = {
       }
     }
 
-    const updatedUser = userRepository.updateMissionOutcome(userId, {
+    const updatedUser = await userRepository.updateMissionOutcome(userId, {
       difficulty: safeDifficulty,
       level: diffProgress.currentLevel,
       score: nextBest,
@@ -110,9 +135,9 @@ export const gameService = {
     };
   },
 
-  saveGameSession(userId, { difficulty, level, score, catches, timeLeft }) {
-    const user = userRepository.findById(userId);
-    if (!user) throw new AppError('User not found.', 404);
+  async saveGameSession(userId, { difficulty, level, score, catches, timeLeft }) {
+    const user = await userRepository.findById(userId);
+    if (!user) throw new AppError('Hunter account not found.', 404);
 
     const safeDifficulty = normalizeDifficulty(difficulty);
     const progress = normalizeProgress(user.progress);
@@ -133,21 +158,21 @@ export const gameService = {
       savedAt: new Date().toISOString(),
     };
 
-    const updatedUser = userRepository.updateSavedGame(userId, snapshot);
+    const updatedUser = await userRepository.updateSavedGame(userId, snapshot);
     return this.buildClientState(updatedUser);
   },
 
-  clearGameSession(userId) {
-    const user = userRepository.findById(userId);
-    if (!user) throw new AppError('User not found.', 404);
+  async clearGameSession(userId) {
+    const user = await userRepository.findById(userId);
+    if (!user) throw new AppError('Hunter account not found.', 404);
 
-    const updatedUser = userRepository.updateSavedGame(userId, null);
+    const updatedUser = await userRepository.updateSavedGame(userId, null);
     return this.buildClientState(updatedUser);
   },
 
-  updateSettings(userId, incomingSettings) {
-    const user = userRepository.findById(userId);
-    if (!user) throw new AppError('User not found.', 404);
+  async updateSettings(userId, incomingSettings) {
+    const user = await userRepository.findById(userId);
+    if (!user) throw new AppError('Hunter account not found.', 404);
 
     const progress = normalizeProgress(user.progress);
     const nextDifficulty = normalizeDifficulty(
@@ -162,7 +187,7 @@ export const gameService = {
       lureStyle: incomingSettings?.lureStyle || user.settings?.lureStyle || 'biolum',
     };
 
-    const updatedUser = userRepository.updateSettings(userId, {
+    const updatedUser = await userRepository.updateSettings(userId, {
       settings: nextSettings,
       difficulty: nextDifficulty,
       level: nextLevel,
@@ -171,11 +196,11 @@ export const gameService = {
     return this.buildClientState(updatedUser);
   },
 
-  getLeaderboard(currentUserId) {
-    const rows = userRepository.findLeaderboard();
+  async getLeaderboard(currentUserId) {
+    const rows = await userRepository.findLeaderboard(50);
     return rows.map((row, idx) => ({
       rank: idx + 1,
-      id: row.id,
+      id: String(row.id),
       name: row.name,
       score: row.score,
       difficulty: row.difficulty,
@@ -183,7 +208,7 @@ export const gameService = {
       totalCatches: row.total_catches,
       gamesPlayed: row.games_played,
       title: getHunterRankTitle(row.score),
-      isCurrentUser: row.id === currentUserId,
+      isCurrentUser: String(row.id) === String(currentUserId),
     }));
   },
 };

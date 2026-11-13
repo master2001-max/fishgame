@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // =========================================================================
+    // FISH CATCHER PRODUCTION SECURITY RULES
+    // =========================================================================
+    // Architecture Enforcement:
+    // The React frontend NEVER connects to Firestore directly.
+    // All reads and writes are mediated by the Express backend API using the
+    // privileged Firebase Admin SDK.
+    //
+    // Therefore, all direct client SDK access is completely denied.
+    // =========================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

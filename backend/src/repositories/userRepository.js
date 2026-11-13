@@ -1,168 +1,60 @@
-import {
-  createDefaultProgress,
-  createDefaultSettings,
-  getDb,
-} from '../db/database.js';
+/**
+ * User Repository Facade & Factory
+ *
+ * Location: backend/src/repositories/userRepository.js
+ * Where it fits: Data Access Layer boundary.
+ *
+ * Why: Implements the Dependency Inversion Principle (DIP). The high-level Services
+ * (authService, gameService) do not care whether the database is SQLite or Cloud Firestore.
+ * This facade forwards all repository calls to the currently active database implementation
+ * selected by the `DB_DRIVER` environment variable.
+ */
 
-function parseJson(raw, fallback) {
-  if (!raw) return fallback;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return fallback;
+import { env } from '../config/env.js';
+import { sqliteUserRepository } from './sqliteUserRepository.js';
+import { firestoreUserRepository } from './firestoreUserRepository.js';
+
+export function getActiveRepository() {
+  if (env.DB_DRIVER === 'firestore') {
+    return firestoreUserRepository;
   }
-}
-
-function mapUserRow(row) {
-  if (!row) return null;
-  return {
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    password: row.password,
-    difficulty: row.difficulty,
-    level: row.level,
-    score: row.score,
-    totalCatches: row.total_catches,
-    gamesPlayed: row.games_played,
-    progress: parseJson(row.progress_json, createDefaultProgress()),
-    savedGame: parseJson(row.saved_game_json, null),
-    settings: parseJson(row.settings_json, createDefaultSettings()),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+  return sqliteUserRepository;
 }
 
 export const userRepository = {
   findById(id) {
-    const row = getDb().prepare('SELECT * FROM users WHERE id = ?').get(id);
-    return mapUserRow(row);
+    return getActiveRepository().findById(id);
   },
 
   findByIdentifier(identifier) {
-    const row = getDb()
-      .prepare(
-        'SELECT * FROM users WHERE LOWER(name) = LOWER(?) OR LOWER(email) = LOWER(?)'
-      )
-      .get(identifier, identifier);
-    return mapUserRow(row);
+    return getActiveRepository().findByIdentifier(identifier);
   },
 
   findByName(name) {
-    const row = getDb()
-      .prepare('SELECT * FROM users WHERE LOWER(name) = LOWER(?)')
-      .get(name);
-    return mapUserRow(row);
+    return getActiveRepository().findByName(name);
   },
 
   findByEmail(email) {
-    const row = getDb()
-      .prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)')
-      .get(email);
-    return mapUserRow(row);
+    return getActiveRepository().findByEmail(email);
   },
 
-  create({ name, email, passwordHash }) {
-    const now = new Date().toISOString();
-    const progress = createDefaultProgress();
-    const settings = createDefaultSettings();
-
-    const result = getDb()
-      .prepare(`
-        INSERT INTO users (
-          name, email, password, difficulty, level, score,
-          total_catches, games_played, progress_json, saved_game_json,
-          settings_json, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `)
-      .run(
-        name,
-        email,
-        passwordHash,
-        'Easy',
-        1,
-        0,
-        0,
-        0,
-        JSON.stringify(progress),
-        null,
-        JSON.stringify(settings),
-        now,
-        now
-      );
-
-    return this.findById(Number(result.lastInsertRowid));
+  create(userData) {
+    return getActiveRepository().create(userData);
   },
 
-  updateMissionOutcome(
-    id,
-    { difficulty, level, score, totalCatches, gamesPlayed, progress }
-  ) {
-    const now = new Date().toISOString();
-    getDb()
-      .prepare(`
-        UPDATE users
-        SET difficulty = ?,
-            level = ?,
-            score = ?,
-            total_catches = ?,
-            games_played = ?,
-            progress_json = ?,
-            saved_game_json = NULL,
-            updated_at = ?
-        WHERE id = ?
-      `)
-      .run(
-        difficulty,
-        level,
-        score,
-        totalCatches,
-        gamesPlayed,
-        JSON.stringify(progress),
-        now,
-        id
-      );
-
-    return this.findById(id);
+  updateMissionOutcome(id, outcome) {
+    return getActiveRepository().updateMissionOutcome(id, outcome);
   },
 
   updateSavedGame(id, savedGame) {
-    const now = new Date().toISOString();
-    getDb()
-      .prepare(`
-        UPDATE users
-        SET saved_game_json = ?,
-            updated_at = ?
-        WHERE id = ?
-      `)
-      .run(savedGame ? JSON.stringify(savedGame) : null, now, id);
-
-    return this.findById(id);
+    return getActiveRepository().updateSavedGame(id, savedGame);
   },
 
-  updateSettings(id, { settings, difficulty, level }) {
-    const now = new Date().toISOString();
-    getDb()
-      .prepare(`
-        UPDATE users
-        SET settings_json = ?,
-            difficulty = ?,
-            level = ?,
-            updated_at = ?
-        WHERE id = ?
-      `)
-      .run(JSON.stringify(settings), difficulty, level, now, id);
-
-    return this.findById(id);
+  updateSettings(id, settingsPayload) {
+    return getActiveRepository().updateSettings(id, settingsPayload);
   },
 
-  findLeaderboard() {
-    return getDb()
-      .prepare(`
-        SELECT id, name, difficulty, level, score, total_catches, games_played, updated_at
-        FROM users
-        ORDER BY score DESC, total_catches DESC, id ASC
-      `)
-      .all();
+  findLeaderboard(limit) {
+    return getActiveRepository().findLeaderboard(limit);
   },
 };

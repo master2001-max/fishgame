@@ -1,3 +1,16 @@
+# Node dependencies
 node_modules/
+
+# Local SQLite storage (keep untouched & not committed)
 data/
+
+# Environment variables & secrets (NEVER commit secrets to Git)
 .env
+.env.*
+!.env.example
+
+# Service account keys and certificates
+*.pem
+*serviceAccount*.json
+*firebase-admin*.json
+*credentials*.json
