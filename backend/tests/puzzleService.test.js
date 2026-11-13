@@ -37,6 +37,7 @@ describe('PuzzleService (Marc Conrad Fish API Interoperability)', () => {
 
     assert.strictEqual(resultWrong.correct, false);
     assert.strictEqual(resultWrong.bonusMarks, 0);
+    assert.strictEqual(resultWrong.penaltyMarks, 500);
     assert.ok(typeof resultWrong.solution === 'number');
 
     // Challenge should be single-use (token consumed)

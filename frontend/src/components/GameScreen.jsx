@@ -72,19 +72,22 @@ function createPearlEntity() {
   };
 }
 
-function createInitialFishes(count = 8) {
-  const oracleFish = FISH_SPECIES.find((f) => f.id === 'oracle') || FISH_SPECIES[0];
-  const basePool = [
-    FISH_SPECIES[0],
-    FISH_SPECIES[1],
-    oracleFish, // Golden Oracle Fish (Marc Conrad API puzzle fish)
-    FISH_SPECIES[2],
-    FISH_SPECIES[3],
-    FISH_SPECIES[4],
-    FISH_SPECIES[5],
-    FISH_SPECIES[1],
-  ];
-  return basePool.slice(0, count).map((sp) => createFishEntity(sp, false));
+function createInitialFishes(count = 5) {
+  const oracleFish = FISH_SPECIES.find((f) => f.id === 'oracle');
+  const normalSpecies = FISH_SPECIES.filter((f) => f.id !== 'oracle');
+  const initial = [];
+
+  // 20% chance to start with the Golden Oracle in the initial pool
+  if (oracleFish && Math.random() < 0.2) {
+    initial.push(oracleFish);
+  }
+
+  while (initial.length < count) {
+    const sp = normalSpecies[Math.floor(Math.random() * normalSpecies.length)];
+    initial.push(sp);
+  }
+
+  return initial.map((sp) => createFishEntity(sp, false));
 }
 
 function pickNextSpecies(level) {
@@ -151,6 +154,7 @@ export default function GameScreen({
   const scoreRef = useRef(initialScore);
   const catchesRef = useRef(initialCatches);
   const timeLeftRef = useRef(initialTimeLeft);
+  const simStateRef = useRef(null);
 
   useEffect(() => {
     isPausedRef.current = isPaused;
@@ -170,17 +174,28 @@ export default function GameScreen({
 
   const handleOracleSuccess = (bonusMarks) => {
     const bonus = Number(bonusMarks) || 1500;
-    const sim = simRef.current;
-    if (sim) {
-      sim.score += bonus;
-      scoreRef.current = sim.score;
-      setScore(sim.score);
-      if (sim.score >= targetMarks) {
-        missionStatusRef.current = 'won';
-        setMissionStatus('won');
-      }
+    const nextScore = scoreRef.current + bonus;
+    scoreRef.current = nextScore;
+    if (simStateRef.current) {
+      simStateRef.current.score = nextScore;
+    }
+    setScore(nextScore);
+    if (nextScore >= targetMarks) {
+      missionStatusRef.current = 'won';
+      setMissionStatus('won');
     }
     setLastCatchBanner(`🎉 Oracle Solved! +${bonus} Bonus Marks added to score!`);
+  };
+
+  const handleOracleFail = (penaltyMarks) => {
+    const penalty = Number(penaltyMarks) || 500;
+    const nextScore = Math.max(0, scoreRef.current - penalty);
+    scoreRef.current = nextScore;
+    if (simStateRef.current) {
+      simStateRef.current.score = nextScore;
+    }
+    setScore(nextScore);
+    setLastCatchBanner(`❌ Wrong Oracle answer! -${penalty} Penalty deducted!`);
   };
 
   const restartMission = () => {
@@ -331,6 +346,7 @@ export default function GameScreen({
       wasSubmerged: false,
       lastTime: performance.now(),
     };
+    simStateRef.current = state;
 
     const spawnParticles = (x, y, color, count = 12, speed = 2.6) => {
       for (let i = 0; i < count; i++) {
@@ -458,16 +474,16 @@ export default function GameScreen({
       ctx.beginPath();
       ctx.moveTo(-species.sizeX * 0.72, 0);
       ctx.quadraticCurveTo(
-        -species.sizeX - 10,
-        -species.sizeY * 0.85 + wag * 5,
-        -species.sizeX - 16,
-        -species.sizeY * 0.75 + wag * 6
+        -species.sizeX * 1.25,
+        -species.sizeY * 0.85 + wag * (species.sizeY * 0.25),
+        -species.sizeX * 1.45,
+        -species.sizeY * 0.75 + wag * (species.sizeY * 0.3)
       );
       ctx.quadraticCurveTo(
-        -species.sizeX - 6,
-        wag * 2,
-        -species.sizeX - 16,
-        species.sizeY * 0.75 + wag * 6
+        -species.sizeX * 1.15,
+        wag * (species.sizeY * 0.1),
+        -species.sizeX * 1.45,
+        species.sizeY * 0.75 + wag * (species.sizeY * 0.3)
       );
       ctx.closePath();
       ctx.fill();
@@ -478,7 +494,7 @@ export default function GameScreen({
       ctx.moveTo(-species.sizeX * 0.25, -species.sizeY * 0.78);
       ctx.quadraticCurveTo(
         0,
-        -species.sizeY * 1.45 + wag * 1.5,
+        -species.sizeY * 1.45 + wag * (species.sizeY * 0.1),
         species.sizeX * 0.22,
         -species.sizeY * 0.8
       );
@@ -522,26 +538,35 @@ export default function GameScreen({
       ctx.fillStyle = species.bellyColor;
       ctx.globalAlpha = 0.7;
       ctx.beginPath();
-      ctx.ellipse(species.sizeX * 0.12, species.sizeY * 0.28, 9, 4.5, 0.45 + wag * 0.12, 0, Math.PI * 2);
+      ctx.ellipse(
+        species.sizeX * 0.12,
+        species.sizeY * 0.28,
+        Math.max(3.5, species.sizeX * 0.22),
+        Math.max(2.2, species.sizeY * 0.24),
+        0.45 + wag * 0.12,
+        0,
+        Math.PI * 2
+      );
       ctx.fill();
       ctx.globalAlpha = 1;
 
       // Eye
       const eyeX = species.sizeX * 0.56;
       const eyeY = -species.sizeY * 0.22;
+      const eyeR = Math.max(2.2, species.sizeY * 0.22);
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(eyeX, eyeY, 4.4, 0, Math.PI * 2);
+      ctx.arc(eyeX, eyeY, eyeR, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = '#020617';
       ctx.beginPath();
-      ctx.arc(eyeX + 1.1, eyeY, 2.2, 0, Math.PI * 2);
+      ctx.arc(eyeX + eyeR * 0.25, eyeY, eyeR * 0.5, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(eyeX + 1.8, eyeY - 0.9, 0.8, 0, Math.PI * 2);
+      ctx.arc(eyeX + eyeR * 0.4, eyeY - eyeR * 0.2, eyeR * 0.2, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
@@ -1141,6 +1166,7 @@ export default function GameScreen({
 
     return () => {
       cancelAnimationFrame(animationFrameId);
+      simStateRef.current = null;
       canvas.removeEventListener('pointermove', handlePointerMove);
       canvas.removeEventListener('pointerdown', handlePointerDown);
       window.removeEventListener('keydown', handleKeyDown);
@@ -1283,6 +1309,7 @@ export default function GameScreen({
             setIsPaused(false);
           }}
           onPuzzleSuccess={handleOracleSuccess}
+          onPuzzleFail={handleOracleFail}
         />
 
         {/* Level Complete / Time's Up Modal */}

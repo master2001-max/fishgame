@@ -101,6 +101,7 @@ export const puzzleService = {
     activePuzzles.delete(puzzleId);
 
     const BONUS_MARKS = 1500; // Special fish gives highest points in the game
+    const PENALTY_MARKS = 500; // Penalty deducted on incorrect guess
 
     if (isCorrect) {
       // Award bonus points to the hunter's profile in Firestore
@@ -122,15 +123,31 @@ export const puzzleService = {
         correct: true,
         solution: puzzle.solution,
         bonusMarks: BONUS_MARKS,
+        penaltyMarks: 0,
         message: `Brilliant! The Oracle confirms ${puzzle.solution} fish. +${BONUS_MARKS} Bonus Marks awarded!`,
       };
+    }
+
+    // On incorrect guess: deduct penalty marks from Firestore user profile if score > 0
+    const user = await userRepository.findById(userId);
+    if (user && user.score > 0) {
+      const nextScore = Math.max(0, user.score - PENALTY_MARKS);
+      await userRepository.updateMissionOutcome(userId, {
+        difficulty: user.difficulty,
+        level: user.level,
+        score: nextScore,
+        totalCatches: user.totalCatches,
+        gamesPlayed: user.gamesPlayed,
+        progress: user.progress,
+      });
     }
 
     return {
       correct: false,
       solution: puzzle.solution,
       bonusMarks: 0,
-      message: `Incorrect! The Oracle picture had ${puzzle.solution} fish. The Golden Oracle slipped away!`,
+      penaltyMarks: PENALTY_MARKS,
+      message: `Incorrect! The Oracle picture had ${puzzle.solution} fish. -${PENALTY_MARKS} Penalty Marks deducted!`,
     };
   },
 
