@@ -95,6 +95,23 @@ export const FISH_SPECIES = [
     maxDepth: 415,
     minLevel: 1,
   },
+  {
+    id: 'oracle',
+    name: 'Golden Oracle of Conrad',
+    points: 1500, // Highest marks in the game!
+    rarity: 'Legendary',
+    isSpecial: true, // Triggers Marc Conrad's Fish API puzzle challenge!
+    speedBase: 2.7,
+    sizeX: 52,
+    sizeY: 26,
+    color: '#fbbf24',
+    accentColor: '#f59e0b',
+    bellyColor: '#fffbeb',
+    glow: 'rgba(251, 191, 36, 0.9)',
+    minDepth: 160,
+    maxDepth: 390,
+    minLevel: 1,
+  },
 ];
 
 export const DIFFICULTY_ORDER = ['Easy', 'Normal', 'Hard'];

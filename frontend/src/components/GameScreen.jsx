@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import PauseModal from './PauseModal';
+import OraclePuzzleModal from './OraclePuzzleModal';
 import {
   AnchorHookIcon,
   PauseIcon,
@@ -72,28 +73,31 @@ function createPearlEntity() {
 }
 
 function createInitialFishes(count = 8) {
+  const oracleFish = FISH_SPECIES.find((f) => f.id === 'oracle') || FISH_SPECIES[0];
   const basePool = [
     FISH_SPECIES[0],
-    FISH_SPECIES[0],
     FISH_SPECIES[1],
-    FISH_SPECIES[1],
+    oracleFish, // Golden Oracle Fish (Marc Conrad API puzzle fish)
     FISH_SPECIES[2],
     FISH_SPECIES[3],
     FISH_SPECIES[4],
     FISH_SPECIES[5],
-    FISH_SPECIES[2],
+    FISH_SPECIES[1],
   ];
   return basePool.slice(0, count).map((sp) => createFishEntity(sp, false));
 }
 
 function pickNextSpecies(level) {
   const roll = Math.random();
+  const oracleFish = FISH_SPECIES.find((f) => f.id === 'oracle');
+  // 15% spawn chance for the Special Golden Oracle Fish
+  if (oracleFish && roll < 0.15) return oracleFish;
   const bonus = Math.min((level - 1) * 0.02, 0.1);
-  if (roll < 0.1 + bonus) return FISH_SPECIES[5]; // Biolume
-  if (roll < 0.28 + bonus) return FISH_SPECIES[4]; // Angelfish
-  if (roll < 0.48) return FISH_SPECIES[3]; // Redfin
-  if (roll < 0.68) return FISH_SPECIES[2]; // Barb
-  if (roll < 0.85) return FISH_SPECIES[1]; // Tetra
+  if (roll < 0.25 + bonus) return FISH_SPECIES[5]; // Biolume
+  if (roll < 0.42 + bonus) return FISH_SPECIES[4]; // Angelfish
+  if (roll < 0.60) return FISH_SPECIES[3]; // Redfin
+  if (roll < 0.78) return FISH_SPECIES[2]; // Barb
+  if (roll < 0.90) return FISH_SPECIES[1]; // Tetra
   return FISH_SPECIES[0]; // Snapper
 }
 
@@ -126,6 +130,7 @@ export default function GameScreen({
   const [timeLeft, setTimeLeft] = useState(initialTimeLeft);
   const [catches, setCatches] = useState(initialCatches);
   const [isPaused, setIsPaused] = useState(false);
+  const [isOracleOpen, setIsOracleOpen] = useState(false);
   const [missionStatus, setMissionStatus] = useState('playing'); // 'playing' | 'won' | 'lost'
   const [runStartBestScore, setRunStartBestScore] = useState(bestScore);
   const [lastCatchBanner, setLastCatchBanner] = useState(
@@ -162,6 +167,21 @@ export default function GameScreen({
   useEffect(() => {
     timeLeftRef.current = timeLeft;
   }, [timeLeft]);
+
+  const handleOracleSuccess = (bonusMarks) => {
+    const bonus = Number(bonusMarks) || 1500;
+    const sim = simRef.current;
+    if (sim) {
+      sim.score += bonus;
+      scoreRef.current = sim.score;
+      setScore(sim.score);
+      if (sim.score >= targetMarks) {
+        missionStatusRef.current = 'won';
+        setMissionStatus('won');
+      }
+    }
+    setLastCatchBanner(`🎉 Oracle Solved! +${bonus} Bonus Marks added to score!`);
+  };
 
   const restartMission = () => {
     scoreRef.current = 0;
@@ -413,7 +433,16 @@ export default function GameScreen({
         ctx.scale(-1, 1);
       }
 
-      if (species.rarity === 'Mythic' || species.rarity === 'Rare') {
+      if (species.isSpecial || species.rarity === 'Legendary') {
+        ctx.save();
+        ctx.shadowColor = '#fbbf24';
+        ctx.shadowBlur = 24;
+        ctx.fillStyle = 'rgba(251, 191, 36, 0.45)';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, species.sizeX * 1.25, species.sizeY * 1.35, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else if (species.rarity === 'Mythic' || species.rarity === 'Rare') {
         ctx.save();
         ctx.shadowColor = species.color;
         ctx.shadowBlur = species.rarity === 'Mythic' ? 18 : 10;
@@ -770,6 +799,13 @@ export default function GameScreen({
                   17
                 );
                 setLastCatchBanner(`🎣 Caught ${sp.name} · +${earned} marks`);
+
+                // Special Oracle Fish Trigger (Marc Conrad API Riddle Challenge)
+                if (sp.isSpecial || sp.id === 'oracle') {
+                  setIsPaused(true);
+                  setIsOracleOpen(true);
+                  setLastCatchBanner('✨ Hooked Golden Oracle Fish! Solve the Riddle from Marc Conrad API for +1500 Bonus!');
+                }
               }
 
               state.caughtEntity = null;
@@ -1239,6 +1275,16 @@ export default function GameScreen({
           />
         )}
 
+        {/* Marc Conrad Fish API Oracle Puzzle Modal */}
+        <OraclePuzzleModal
+          isOpen={isOracleOpen}
+          onClose={() => {
+            setIsOracleOpen(false);
+            setIsPaused(false);
+          }}
+          onPuzzleSuccess={handleOracleSuccess}
+        />
+
         {/* Level Complete / Time's Up Modal */}
         {isEnded && (
           <div className="absolute inset-0 bg-[#020b18]/80 backdrop-blur-md rounded-[28px] flex items-center justify-center p-4 z-20">
@@ -1324,6 +1370,20 @@ export default function GameScreen({
               </div>
 
               <div className="flex flex-col gap-2.5 w-full">
+                {missionStatus === 'won' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundEngine.playClick();
+                      setIsOracleOpen(true);
+                    }}
+                    className="w-full h-10 rounded-xl flex items-center justify-center gap-2 text-xs font-bold bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 cursor-pointer transition-all shadow-[0_0_12px_rgba(251,191,36,0.2)]"
+                  >
+                    <SparklesIcon className="w-3.5 h-3.5" />
+                    <span>Consult Dr. Marc Conrad's Fish Oracle (+1500 Marks)</span>
+                  </button>
+                )}
+
                 {missionStatus === 'won' ? (
                   nextStage ? (
                     <button

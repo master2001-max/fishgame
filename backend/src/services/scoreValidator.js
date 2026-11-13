@@ -13,8 +13,9 @@
 import { AppError } from '../utils/appError.js';
 
 // Game physics & economic constraints
-const MAX_FISH_BASE_POINTS = 400; // Abyssal Biolume (highest base score)
-const PEARL_MAX_BONUS = 500;      // Maximum possible bonus pearls in a single mission
+const MAX_FISH_BASE_POINTS = 1500; // Golden Oracle of Conrad (1500 pts) / Abyssal Biolume (400 pts)
+const PEARL_MAX_BONUS = 500;       // Maximum possible bonus pearls in a single mission
+const ORACLE_MAX_BONUS = 3000;     // Maximum bonus from Dr. Marc Conrad's external Oracle riddles
 const MIN_CATCH_DURATION_SEC = 1.5; // Physical time required to drop, hook, and retract line
 
 const DIFFICULTY_LIMITS = {
@@ -70,9 +71,9 @@ export const scoreValidator = {
     }
 
     // 3. Mathematical score ceiling check
-    // Even if every single fish was the rarest fish + all pearls collected
+    // Even if every single fish was the legendary Golden Oracle fish + bonus riddles & pearls
     const theoreticalMax = Math.ceil(
-      (numCatches * MAX_FISH_BASE_POINTS + PEARL_MAX_BONUS) * diff.multiplier
+      (numCatches * MAX_FISH_BASE_POINTS + PEARL_MAX_BONUS + ORACLE_MAX_BONUS) * diff.multiplier
     );
 
     // If catches == 0, score cannot be positive (unless small pearl bonus only)

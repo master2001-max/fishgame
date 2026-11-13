@@ -56,3 +56,8 @@ export const updateSettingsSchema = z.object({
   difficulty: z.enum(['Easy', 'Normal', 'Hard', 'Medium']).optional(),
   lureStyle: z.enum(['steel', 'biolum', 'solar']).optional(),
 });
+
+export const puzzleVerifySchema = z.object({
+  puzzleId: z.string().min(1, 'Puzzle ID is required'),
+  answer: z.coerce.number().int().min(0, 'Answer must be a non-negative number').max(99),
+});

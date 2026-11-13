@@ -10,7 +10,7 @@
  */
 
 import { getFirestore } from '../config/firebase.js';
-import { createDefaultProgress, createDefaultSettings } from '../db/database.js';
+import { createDefaultProgress, createDefaultSettings } from '../config/defaults.js';
 
 function mapDocToUser(id, data) {
   if (!data) return null;

@@ -115,3 +115,53 @@ sequenceDiagram
    - Upserts `scores/{userId}` with high score and rank title for the public leaderboard.
    - Deletes any paused state in `gameSessions/{userId}`.
 10. **Response Flow:** Returns `{ state, isNewHighScore }` with HTTP `200 OK` to the frontend, which unlocks Level 2 on the Main Menu and updates audio and stats.
+
+---
+
+## 3. Third-Party Web Service Interoperability (Marc Conrad Fish Game API)
+
+To satisfy the **Interoperability** theme of the CIS045-3 Distributed Service Architectures unit, the system integrates with an external RESTful web service provided by the University of Bedfordshire:
+**Dr. Marc Conrad's Fish Game API** (`https://marcconrad.com/uob/fish/api.php?out=json`).
+
+### Architectural Secure Proxy Pattern
+The external web service returns both the question image URL (`question`) and the numerical solution (`fish`). 
+
+> [!CAUTION] Security Risk of Direct Client Calls
+> If the browser called Dr. Conrad's API directly, any user inspecting the Network tab in DevTools would immediately see the answer in the JSON response, defeating the riddle challenge.
+
+To preserve game integrity and demonstrate enterprise distributed systems design, our Node.js backend acts as a **Secure Proxy & Challenge Authority**:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Player
+    participant UI as GameScreen / Modal
+    participant Express as Express Backend
+    participant PuzzleSvc as puzzleService.js
+    participant ConradAPI as Dr. Marc Conrad API (marcconrad.com)
+    participant Firestore as Cloud Firestore
+
+    Player->>UI: Catches "Golden Oracle of Conrad" (Legendary Fish)
+    UI->>Express: GET /api/game/puzzle/challenge (Bearer Token)
+    Express->>PuzzleSvc: createChallenge(userId)
+    PuzzleSvc->>ConradAPI: HTTPS GET /uob/fish/api.php?out=json
+    ConradAPI-->>PuzzleSvc: { question: "imageUrl", fish: 4, chest: 1 }
+    
+    Note over PuzzleSvc: Separates solution from challenge.<br/>Generates UUID puzzleId.<br/>Stores puzzleId -> { solution: 4, userId } in memory.
+    
+    PuzzleSvc-->>Express: Return { puzzleId, imageUrl, prompt }
+    Express-->>UI: HTTP 200 OK (Solution stripped!)
+    UI-->>Player: Displays Oracle riddle modal with counting image
+    
+    Player->>UI: Enters answer (e.g. 4)
+    UI->>Express: POST /api/game/puzzle/verify { puzzleId, answer: 4 }
+    Express->>PuzzleSvc: verifyAnswer(userId, { puzzleId, answer })
+    
+    Note over PuzzleSvc: Verifies user ownership & answer == 4.<br/>Consumes puzzleId (Single-use token).
+    
+    PuzzleSvc->>Firestore: update doc `users/{userId}` (+1500 Bonus Marks)
+    PuzzleSvc-->>Express: Return { correct: true, bonusMarks: 1500 }
+    Express-->>UI: HTTP 200 OK
+    UI-->>Player: Confirms victory, awards +1500 points, resumes game loop
+```
+

@@ -2,7 +2,7 @@
  * Central Environment Configuration
  *
  * Location: backend/src/config/env.js
- * Where it fits: Loaded on application start before database and express setup.
+ * Where it fits: Loaded on application start before express and Firebase setup.
  *
  * Why: Centralizes all configuration variables and environment fallbacks in one place.
  * Ensures .env is loaded reliably regardless of whether the process was started from the root
@@ -25,11 +25,10 @@ export const env = {
   PORT: Number(process.env.PORT) || 4000,
   CLIENT_ORIGIN: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
 
-  // Database Driver Strategy: 'firestore' or 'sqlite'
-  DB_DRIVER: (process.env.DB_DRIVER || 'firestore').toLowerCase(),
+  // Database Driver Strategy: Firestore (Pure Cloud Database)
+  DB_DRIVER: 'firestore',
 
-  // SQLite Settings (used when DB_DRIVER === 'sqlite')
-  DB_PATH: process.env.DB_PATH || path.join(BACKEND_ROOT, 'data', 'fishcatcher.db'),
+  // JWT Configuration (for session signatures)
   JWT_SECRET: process.env.JWT_SECRET || 'fishcatcher-dev-secret-change-in-prod',
   JWT_EXPIRES_IN: '7d',
 
@@ -43,10 +42,6 @@ export const env = {
     credentialsPath: process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(BACKEND_ROOT, 'serviceAccountKey.json'),
   },
 
-  // Default Administrator seed for local testing
-  ADMIN_SEED: {
-    name: process.env.ADMIN_NAME || 'admin',
-    email: process.env.ADMIN_EMAIL || 'admin@fishcatcher.local',
-    password: process.env.ADMIN_PASSWORD || 'Admin@123',
-  },
+  // Third-Party Interoperability: Marc Conrad's Fish Game API
+  FISH_API_BASE: process.env.FISH_API_BASE || 'https://marcconrad.com/uob/fish/api.php',
 };

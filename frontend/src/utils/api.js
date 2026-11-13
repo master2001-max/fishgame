@@ -81,4 +81,16 @@ export const gameApi = {
   getLeaderboard() {
     return request('/game/leaderboard');
   },
+
+  // Third-Party Interoperability: Marc Conrad Fish Game API
+  getPuzzleChallenge() {
+    return request('/game/puzzle/challenge');
+  },
+
+  verifyPuzzle(payload) {
+    return request('/game/puzzle/verify', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
 };

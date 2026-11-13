@@ -7,12 +7,14 @@
 
 import { Router } from 'express';
 import { gameController } from '../controllers/gameController.js';
+import { puzzleController } from '../controllers/puzzleController.js';
 import { requireAuth } from '../middleware/authMiddleware.js';
 import { validateBody } from '../middleware/validate.js';
 import {
   completeMissionSchema,
   saveSessionSchema,
   updateSettingsSchema,
+  puzzleVerifySchema,
 } from '../validators/schemas.js';
 
 const router = Router();
@@ -26,5 +28,9 @@ router.post('/save-session', validateBody(saveSessionSchema), gameController.sav
 router.delete('/save-session', gameController.clearSession);
 router.put('/settings', validateBody(updateSettingsSchema), gameController.updateSettings);
 router.get('/leaderboard', gameController.getLeaderboard);
+
+// Third-Party Interoperability: Marc Conrad Fish Game API
+router.get('/puzzle/challenge', puzzleController.getChallenge);
+router.post('/puzzle/verify', validateBody(puzzleVerifySchema), puzzleController.verifyAnswer);
 
 export default router;

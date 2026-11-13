@@ -2,7 +2,7 @@
  * Authentication Middleware (Firebase ID Token Verification)
  *
  * Location: backend/src/middleware/authMiddleware.js
- * Where it fits: Security boundary. Protects all /api/game/* and private user routes.
+ * Where it fits: Security boundary. Protects /api/game/* and private user routes.
  *
  * Why: The React client sends a cryptographically signed Firebase ID token in the
  * 'Authorization: Bearer <token>' header. This middleware verifies the token with the
@@ -24,32 +24,26 @@ export async function requireAuth(req, res, next) {
     });
   }
 
-  // 1. Firebase ID Token Verification (Production Firestore Mode)
-  if (env.DB_DRIVER === 'firestore') {
-    try {
-      const auth = getFirebaseAuth();
-      if (!auth) {
-        throw new Error('Firebase Auth is not initialized');
-      }
-      const decodedToken = await auth.verifyIdToken(token);
-      req.userId = decodedToken.uid;
-      req.userEmail = decodedToken.email;
-      return next();
-    } catch (err) {
-      return res.status(401).json({
-        error: 'Invalid or expired Firebase authentication token. Please sign in again.',
-      });
-    }
-  }
-
-  // 2. Legacy JWT Fallback (SQLite Mode)
+  // 1. Verify with Firebase Admin SDK
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET);
-    req.userId = payload.userId;
+    const auth = getFirebaseAuth();
+    if (!auth) {
+      throw new Error('Firebase Auth is not initialized');
+    }
+    const decodedToken = await auth.verifyIdToken(token);
+    req.userId = decodedToken.uid;
+    req.userEmail = decodedToken.email;
     return next();
   } catch {
-    return res.status(401).json({
-      error: 'Session expired or invalid. Please sign in again.',
-    });
+    // 2. Fallback to signed JWT verification if custom token / test token
+    try {
+      const payload = jwt.verify(token, env.JWT_SECRET);
+      req.userId = payload.userId;
+      return next();
+    } catch {
+      return res.status(401).json({
+        error: 'Invalid or expired authentication token. Please sign in again.',
+      });
+    }
   }
 }
