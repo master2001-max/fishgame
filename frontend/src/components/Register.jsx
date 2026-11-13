@@ -8,6 +8,8 @@ import {
   SparklesIcon,
   UserIcon,
 } from './Icons';
+import { authApi } from '../utils/api';
+import { setAuthToken } from '../utils/storage';
 import { soundEngine } from '../utils/sound';
 
 export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
@@ -15,13 +17,30 @@ export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const cleaned = username.trim();
-    if (cleaned && email.trim() && password) {
+    const cleanedName = username.trim();
+    const cleanedEmail = email.trim();
+    if (!cleanedName || !cleanedEmail || !password) return;
+
+    setError('');
+    setSubmitting(true);
+    try {
       soundEngine.playClick();
-      onRegisterSuccess(cleaned);
+      const data = await authApi.register({
+        name: cleanedName,
+        email: cleanedEmail,
+        password,
+      });
+      setAuthToken(data.token);
+      onRegisterSuccess(data.state);
+    } catch (err) {
+      setError(err.message || 'Registration failed.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -42,9 +61,15 @@ export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
           </div>
         </div>
 
-        <p className="text-sm text-slate-300/85 mb-6 text-center">
-          Register your vessel callsign to track high scores and climb ranks.
+        <p className="text-sm text-slate-300/85 mb-5 text-center">
+          Register your account to save level progress and compete for high scores.
         </p>
+
+        {error && (
+          <div className="w-full mb-4 px-3.5 py-2.5 rounded-xl bg-rose-500/15 border border-rose-400/35 text-xs text-rose-200 font-medium">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
@@ -52,7 +77,7 @@ export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
               htmlFor="register-username"
               className="text-xs font-semibold uppercase tracking-wider text-cyan-200/85 pl-1"
             >
-              Hunter Callsign
+              Hunter Name
             </label>
             <div className="relative">
               <UserIcon className="w-4 h-4 text-cyan-300/65 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -63,6 +88,8 @@ export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
+                minLength={2}
+                disabled={submitting}
                 className="glass-input w-full h-11 pl-10 pr-4 rounded-xl text-sm"
               />
             </div>
@@ -80,10 +107,11 @@ export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
               <input
                 id="register-email"
                 type="email"
-                placeholder="hunter@deepsea.io"
+                placeholder="hunter@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={submitting}
                 className="glass-input w-full h-11 pl-10 pr-4 rounded-xl text-sm"
               />
             </div>
@@ -101,10 +129,12 @@ export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
               <input
                 id="register-password"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="Create a secure password"
+                placeholder="Minimum 6 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={6}
+                disabled={submitting}
                 className="glass-input w-full h-11 pl-10 pr-11 rounded-xl text-sm"
               />
               <button
@@ -120,10 +150,11 @@ export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
 
           <button
             type="submit"
-            className="btn-ocean-primary w-full h-12 rounded-xl mt-2 flex items-center justify-center gap-2 text-sm tracking-wide cursor-pointer"
+            disabled={submitting}
+            className="btn-ocean-primary w-full h-12 rounded-xl mt-2 flex items-center justify-center gap-2 text-sm tracking-wide cursor-pointer disabled:opacity-60"
           >
             <SparklesIcon className="w-4 h-4" />
-            <span>Join the Hunt</span>
+            <span>{submitting ? 'Creating Account...' : 'Join the Hunt'}</span>
           </button>
         </form>
 

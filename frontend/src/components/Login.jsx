@@ -1,38 +1,45 @@
 import { useState } from 'react';
 import {
   BrandCrest,
-  CompassIcon,
   EyeIcon,
   EyeOffIcon,
   LockIcon,
   PlayIcon,
   UserIcon,
 } from './Icons';
+import { authApi } from '../utils/api';
+import { setAuthToken } from '../utils/storage';
 import { soundEngine } from '../utils/sound';
 
 export default function Login({ onLoginSuccess, onSwitchToRegister }) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const cleaned = identifier.trim();
-    if (cleaned && password) {
-      soundEngine.playClick();
-      onLoginSuccess(cleaned);
-    }
-  };
+    if (!cleaned || !password) return;
 
-  const handleGuestDive = () => {
-    soundEngine.playClick();
-    onLoginSuccess('Guest Hunter');
+    setError('');
+    setSubmitting(true);
+    try {
+      soundEngine.playClick();
+      const data = await authApi.login({ identifier: cleaned, password });
+      setAuthToken(data.token);
+      onLoginSuccess(data.state);
+    } catch (err) {
+      setError(err.message || 'Sign in failed. Please check your credentials.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="w-full max-w-[460px] mx-auto px-4 animate-modal-enter">
       <div className="glass-panel rounded-[28px] p-7 sm:p-9 flex flex-col items-center relative overflow-hidden">
-        {/* Top specular highlight */}
         <div className="absolute top-0 inset-x-12 h-px bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
 
         <div className="flex items-center gap-3 mb-2">
@@ -47,9 +54,15 @@ export default function Login({ onLoginSuccess, onSwitchToRegister }) {
           </div>
         </div>
 
-        <p className="text-sm text-slate-300/85 mb-7 text-center">
-          Enter your hunter credentials to launch your expedition.
+        <p className="text-sm text-slate-300/85 mb-6 text-center">
+          Sign in with your registered hunter account to play.
         </p>
+
+        {error && (
+          <div className="w-full mb-4 px-3.5 py-2.5 rounded-xl bg-rose-500/15 border border-rose-400/35 text-xs text-rose-200 font-medium">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
@@ -64,10 +77,11 @@ export default function Login({ onLoginSuccess, onSwitchToRegister }) {
               <input
                 id="login-identifier"
                 type="text"
-                placeholder="e.g. CaptainNemo"
+                placeholder="Enter username or email"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 required
+                disabled={submitting}
                 className="glass-input w-full h-11 pl-10 pr-4 rounded-xl text-sm"
               />
             </div>
@@ -89,6 +103,7 @@ export default function Login({ onLoginSuccess, onSwitchToRegister }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={submitting}
                 className="glass-input w-full h-11 pl-10 pr-11 rounded-xl text-sm"
               />
               <button
@@ -104,27 +119,13 @@ export default function Login({ onLoginSuccess, onSwitchToRegister }) {
 
           <button
             type="submit"
-            className="btn-ocean-primary w-full h-12 rounded-xl mt-2 flex items-center justify-center gap-2 text-sm tracking-wide cursor-pointer"
+            disabled={submitting}
+            className="btn-ocean-primary w-full h-12 rounded-xl mt-2 flex items-center justify-center gap-2 text-sm tracking-wide cursor-pointer disabled:opacity-60"
           >
             <PlayIcon className="w-4 h-4" />
-            <span>Dive In</span>
+            <span>{submitting ? 'Signing In...' : 'Dive In'}</span>
           </button>
         </form>
-
-        <div className="w-full flex items-center gap-3 my-4">
-          <div className="flex-1 h-px bg-cyan-200/15" />
-          <span className="text-[11px] uppercase tracking-widest text-slate-400">or</span>
-          <div className="flex-1 h-px bg-cyan-200/15" />
-        </div>
-
-        <button
-          type="button"
-          onClick={handleGuestDive}
-          className="btn-ocean-secondary w-full h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-semibold cursor-pointer"
-        >
-          <CompassIcon className="w-4 h-4 text-cyan-300" />
-          <span>Quick Dive as Guest</span>
-        </button>
 
         <p className="mt-6 text-xs text-slate-300/80">
           New to the fleet?{' '}

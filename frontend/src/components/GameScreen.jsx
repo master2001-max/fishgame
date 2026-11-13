@@ -101,8 +101,11 @@ export default function GameScreen({
   settings,
   level,
   bestScore,
+  resumeSession,
   onUpdateSettings,
   onMissionComplete,
+  onSaveProgress,
+  onSaveAndExit,
   onAdvanceStage,
   onReturnHome,
   onOpenLeaderboard,
@@ -114,15 +117,21 @@ export default function GameScreen({
   const targetMarks = getLevelTargetMarks(activeDifficulty, level);
   const nextStage = getNextStage(activeDifficulty, level);
 
+  const initialScore = resumeSession?.score ?? 0;
+  const initialCatches = resumeSession?.catches ?? 0;
+  const initialTimeLeft = resumeSession?.timeLeft ?? diffConf.duration;
+
   const [runId, setRunId] = useState(0);
-  const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(diffConf.duration);
-  const [catches, setCatches] = useState(0);
+  const [score, setScore] = useState(initialScore);
+  const [timeLeft, setTimeLeft] = useState(initialTimeLeft);
+  const [catches, setCatches] = useState(initialCatches);
   const [isPaused, setIsPaused] = useState(false);
   const [missionStatus, setMissionStatus] = useState('playing'); // 'playing' | 'won' | 'lost'
   const [runStartBestScore, setRunStartBestScore] = useState(bestScore);
   const [lastCatchBanner, setLastCatchBanner] = useState(
-    `Target: ${targetMarks.toLocaleString()} marks · Steer with mouse or A/D · Click or Space to drop hook`
+    resumeSession
+      ? `Resumed at ${initialScore.toLocaleString()} marks · Target: ${targetMarks.toLocaleString()} marks`
+      : `Target: ${targetMarks.toLocaleString()} marks · Steer with mouse or A/D · Click or Space to drop hook`
   );
 
   const isEnded = missionStatus !== 'playing';
@@ -134,8 +143,9 @@ export default function GameScreen({
   const settingsRef = useRef(settings);
   const reportedRunRef = useRef(-1);
 
-  const scoreRef = useRef(0);
-  const catchesRef = useRef(0);
+  const scoreRef = useRef(initialScore);
+  const catchesRef = useRef(initialCatches);
+  const timeLeftRef = useRef(initialTimeLeft);
 
   useEffect(() => {
     isPausedRef.current = isPaused;
@@ -149,9 +159,14 @@ export default function GameScreen({
     settingsRef.current = settings;
   }, [settings]);
 
+  useEffect(() => {
+    timeLeftRef.current = timeLeft;
+  }, [timeLeft]);
+
   const restartMission = () => {
     scoreRef.current = 0;
     catchesRef.current = 0;
+    timeLeftRef.current = diffConf.duration;
     missionStatusRef.current = 'playing';
     setScore(0);
     setTimeLeft(diffConf.duration);
@@ -164,6 +179,37 @@ export default function GameScreen({
     );
     setRunId((id) => id + 1);
   };
+
+  // Auto-save active run periodically & on tab close so player can resume where they stopped
+  useEffect(() => {
+    if (!onSaveProgress || missionStatus !== 'playing') return undefined;
+
+    const buildSnapshot = () => ({
+      difficulty: activeDifficulty,
+      level,
+      score: scoreRef.current,
+      catches: catchesRef.current,
+      timeLeft: timeLeftRef.current,
+    });
+
+    const interval = setInterval(() => {
+      if (missionStatusRef.current === 'playing' && timeLeftRef.current > 0) {
+        onSaveProgress(buildSnapshot());
+      }
+    }, 4000);
+
+    const handleBeforeUnload = () => {
+      if (missionStatusRef.current === 'playing' && timeLeftRef.current > 0) {
+        onSaveProgress(buildSnapshot(), { keepalive: true });
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [activeDifficulty, level, missionStatus, onSaveProgress]);
 
   // Keyboard pause shortcut (Esc / P)
   useEffect(() => {
@@ -260,8 +306,8 @@ export default function GameScreen({
       popups: [],
       keys: { left: false, right: false },
       shakeTime: 0,
-      score: 0,
-      catches: 0,
+      score: scoreRef.current,
+      catches: catchesRef.current,
       wasSubmerged: false,
       lastTime: performance.now(),
     };
@@ -1175,7 +1221,19 @@ export default function GameScreen({
           <PauseModal
             onResume={() => setIsPaused(false)}
             onNewGame={restartMission}
-            onReturnHome={onReturnHome}
+            onReturnHome={() => {
+              if (onSaveAndExit) {
+                onSaveAndExit({
+                  difficulty: activeDifficulty,
+                  level,
+                  score: scoreRef.current,
+                  catches: catchesRef.current,
+                  timeLeft: timeLeftRef.current,
+                });
+              } else {
+                onReturnHome();
+              }
+            }}
             settings={settings}
             onUpdateSettings={onUpdateSettings}
           />

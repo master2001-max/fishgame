@@ -213,14 +213,6 @@ export const LURE_STYLES = {
   },
 };
 
-export const SEEDED_HUNTERS = [
-  { name: 'Isuru', score: 3000, title: 'Tide Sovereign' },
-  { name: 'Ravindu', score: 2700, title: 'Abyss Stalker' },
-  { name: 'Pathum', score: 2670, title: 'Abyss Stalker' },
-  { name: 'Sehan', score: 2500, title: 'Reef Master' },
-  { name: 'User123', score: 2100, title: 'Deep Tracker' },
-];
-
 export function getHunterRankTitle(bestScore) {
   if (bestScore >= 3000) return 'Tide Sovereign';
   if (bestScore >= 2200) return 'Abyss Stalker';

@@ -87,7 +87,7 @@ export default function PauseModal({
                 className="w-full h-11 rounded-xl border border-rose-400/25 bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 font-semibold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
               >
                 <LogoutIcon className="w-4 h-4" />
-                <span>Return to Hub</span>
+                <span>Save &amp; Return to Hub</span>
               </button>
             </div>
           </>
