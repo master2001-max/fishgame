@@ -47,9 +47,9 @@ if ($catches > $diffConf['maxCatches']) {
 }
 
 // 2. Mathematical score ceiling check
-$maxFishBase    = 1500;
+$maxFishBase    = 500;
 $pearlBonus     = 500;
-$oracleBonus    = 3000;
+$oracleBonus    = 800;
 $theoreticalMax = ceil(($catches * $maxFishBase + $pearlBonus + $oracleBonus) * $diffConf['multiplier']);
 
 if ($catches === 0 && $score > ($pearlBonus * $diffConf['multiplier'])) {

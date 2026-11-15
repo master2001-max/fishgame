@@ -110,12 +110,12 @@ const FISH_SPECIES = [
     {
         id: 'oracle',
         name: 'Golden Oracle of Conrad',
-        points: 1500, // Highest marks in the game!
+        points: 150, // Balanced marks (not 1500!) so levels aren't instantly skipped
         rarity: 'Legendary',
-        isSpecial: true, // Triggers Marc Conrad's Fish API puzzle challenge!
-        speedBase: 3.2,
-        sizeX: 16, // Nimble & rare
-        sizeY: 8,
+        isSpecial: true, // Triggers Marc Conrad's Fish API puzzle challenge automatically!
+        speedBase: 2.2, // Smooth, approachable swimming speed
+        sizeX: 18,
+        sizeY: 9,
         color: '#fbbf24',
         accentColor: '#f59e0b',
         bellyColor: '#fffbeb',
@@ -231,8 +231,8 @@ function createPearlEntity() {
 function pickNextSpecies(level) {
     const roll = Math.random();
     const oracleFish = FISH_SPECIES.find((f) => f.id === 'oracle');
-    // 15% spawn chance for the Special Golden Oracle Fish
-    if (oracleFish && roll < 0.15) return oracleFish;
+    // 25% spawn chance so the Special Oracle Fish is accessible in demonstrations
+    if (oracleFish && roll < 0.25) return oracleFish;
     const bonus = Math.min((level - 1) * 0.02, 0.1);
     if (roll < 0.25 + bonus) return FISH_SPECIES[5]; // Biolume
     if (roll < 0.42 + bonus) return FISH_SPECIES[4]; // Angelfish
@@ -330,7 +330,7 @@ class FishCatcherGame {
         const oracle = FISH_SPECIES.find((f) => f.id === 'oracle');
         const normal = FISH_SPECIES.filter((f) => f.id !== 'oracle');
 
-        if (oracle && Math.random() < 0.2) {
+        if (oracle && Math.random() < 0.35) {
             initial.push(oracle);
         }
         while (initial.length < count) {
@@ -590,12 +590,16 @@ class FishCatcherGame {
 
             if (data.success) {
                 this.currentPuzzleId = data.puzzleId;
-                img.src = data.imageUrl;
-                img.onload = () => {
+                const reveal = () => {
                     loading.style.display = 'none';
                     content.style.display = 'flex';
                     input.focus();
                 };
+                img.onload = reveal;
+                img.src = data.imageUrl;
+                if (img.complete) {
+                    reveal();
+                }
             } else {
                 throw new Error(data.error || 'Failed to summon riddle.');
             }
@@ -649,23 +653,19 @@ class FishCatcherGame {
                 this.updateHUD();
 
                 if (window.soundEngine) window.soundEngine.playLevelUp();
-                this.catchBanner.textContent = `✨ Oracle Solved! +${result.bonusMarks} Legendary Bonus Marks!`;
-
-                if (this.score >= this.targetMarks) {
-                    this.handleMissionOutcome();
-                }
+                this.catchBanner.textContent = `✨ Oracle Solved! +${result.bonusMarks} Bonus Marks!`;
             } else {
                 banner.style.background = 'rgba(244, 63, 94, 0.2)';
                 banner.style.border = '1px solid rgba(244, 63, 94, 0.4)';
                 banner.style.color = '#fecdd3';
                 title.textContent = '❌ Incorrect Riddle Guess!';
-                msg.textContent = `${result.message} (-${result.penaltyMarks || 500} Marks)`;
+                msg.textContent = `${result.message} (-${result.penaltyMarks || 50} Marks)`;
 
-                this.score = Math.max(0, this.score - (result.penaltyMarks || 500));
+                this.score = Math.max(0, this.score - (result.penaltyMarks || 50));
                 this.updateHUD();
 
                 if (window.soundEngine) window.soundEngine.playZap();
-                this.catchBanner.textContent = `⚠️ Wrong Oracle Guess! -${result.penaltyMarks || 500} Penalty Deducted!`;
+                this.catchBanner.textContent = `⚠️ Wrong Oracle Guess! -${result.penaltyMarks || 50} Penalty Deducted!`;
             }
         } catch (err) {
             console.error('Verification error:', err);
@@ -676,6 +676,12 @@ class FishCatcherGame {
         this.oracleModal.style.display = 'none';
         this.isOracleOpen = false;
         this.isPaused = false;
+        this.updateHUD();
+
+        // Check if level was cleared after receiving oracle marks
+        if (this.score >= this.targetMarks && this.missionStatus === 'playing') {
+            this.handleMissionOutcome();
+        }
     }
 
     // ========================================================
@@ -918,7 +924,13 @@ class FishCatcherGame {
                             this.sim.hookState = 'retracting';
                             this.spawnParticles(hookX, this.sim.hookY, fish.species.color, 14, 2.8);
                             if (window.soundEngine) {
-                                window.soundEngine.playCatch(fish.species.rarity === 'Rare' || fish.species.rarity === 'Mythic');
+                                window.soundEngine.playCatch(fish.species.rarity === 'Rare' || fish.species.rarity === 'Legendary');
+                            }
+
+                            // AUTOMATIC POPUP: Catching the special fish immediately pops up the Marc Conrad API Riddle!
+                            if (fish.species.isSpecial || fish.species.id === 'oracle') {
+                                this.catchBanner.textContent = '✨ Hooked Golden Oracle Fish! Marc Conrad API Challenge Activated!';
+                                this.openOracleChallenge();
                             }
                             break;
                         }
@@ -963,16 +975,12 @@ class FishCatcherGame {
                             this.spawnPopup(hookX, WATER_SURFACE_Y - 8, `+${earned}`, sp.color, 17);
                             this.catchBanner.textContent = `🎣 Caught ${sp.name} · +${earned} marks`;
 
-                            // Special Oracle Fish Hooked Trigger (Marc Conrad API Challenge!)
-                            if (sp.isSpecial || sp.id === 'oracle') {
-                                this.catchBanner.textContent = '✨ Hooked Golden Oracle Fish! Solve the Riddle from Marc Conrad API for +1500 Bonus!';
-                                this.openOracleChallenge();
-                            }
                         }
 
                         this.sim.caughtEntity = null;
 
-                        if (this.score >= this.targetMarks) {
+                        // Only complete the level if the riddle modal is not actively open
+                        if (this.score >= this.targetMarks && !this.isOracleOpen) {
                             this.handleMissionOutcome();
                         }
                     }

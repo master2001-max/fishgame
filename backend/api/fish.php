@@ -146,8 +146,8 @@ if ($action === 'verify') {
     // Consume single-use challenge token immediately
     unset($_SESSION['current_puzzle']);
 
-    $BONUS_MARKS   = 1500; // Special fish awards highest bonus marks in the game
-    $PENALTY_MARKS = 500;  // Deducted on incorrect guess
+    $BONUS_MARKS   = 200; // Balanced reward: +200 marks for solving Dr. Marc Conrad riddle
+    $PENALTY_MARKS = 50;  // Balanced penalty: -50 marks on incorrect guess
 
     try {
         $pdo = getDBConnection();

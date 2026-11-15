@@ -1,53 +1,60 @@
 <?php
 /**
- * Hunter's Gear & Settings View
- * File: gear.php
+ * Hunter's Gear & Preferences View
+ * File: frontend/gear.php
  * 
  * Demonstrates:
- * - Event-Driven Programming: Interactive toggle switches and lure selection.
- * - Virtual Identity: Persisting hunter equipment and audio preferences into MySQL.
+ * - Theme D (Virtual Identity): Configures player audio, difficulty, and visual lure style.
+ * - Theme A (Low Coupling): Presentation styled purely via external CSS classes in css/style.css (Zero inline CSS).
+ * - Theme B (Event-Driven Programming): Instant DOM events persist preferences asynchronously via fetch().
  */
 
 require_once __DIR__ . '/../backend/config/database.php';
-requireAuth();
+requireAuth(); // Guard: session verification
 
 $userId = (int)$_SESSION['user_id'];
 $pdo = getDBConnection();
 
-$stmt = $pdo->prepare("SELECT settings, difficulty FROM users WHERE id = :id LIMIT 1");
+$stmt = $pdo->prepare("SELECT * FROM users WHERE id = :id LIMIT 1");
 $stmt->execute([':id' => $userId]);
 $user = $stmt->fetch();
 
-$settings = json_decode($user['settings'] ?? '{}', true) ?? getDefaultSettings();
+if (!$user) {
+    header('Location: logout.php');
+    exit;
+}
+
+$settings = json_decode($user['settings'], true) ?? getDefaultSettings();
 $currentDiff = $settings['difficulty'] ?? ($user['difficulty'] ?? 'Easy');
 $currentLure = $settings['lureStyle'] ?? 'biolum';
-$musicOn = !empty($settings['music']);
-$sfxOn = !empty($settings['sfx']);
+$musicOn = (bool)($settings['music'] ?? true);
+$sfxOn   = (bool)($settings['sfx'] ?? true);
 
 $lureStyles = [
-    'steel'  => ['name' => 'Classic Steel', 'hex' => '#cbd5e1', 'glow' => 'rgba(148, 163, 184, 0.45)'],
-    'biolum' => ['name' => 'Biolume Cyan',  'hex' => '#22d3ee', 'glow' => 'rgba(34, 211, 238, 0.85)'],
-    'solar'  => ['name' => 'Solar Gold',   'hex' => '#fbbf24', 'glow' => 'rgba(251, 191, 36, 0.85)'],
+    'steel'  => ['name' => 'Forged Steel', 'class' => 'steel'],
+    'biolum' => ['name' => 'Bioluminescent', 'class' => 'biolum'],
+    'solar'  => ['name' => 'Solar Gold',   'class' => 'solar'],
 ];
 
 $pageTitle = 'Hunter’s Gear - Fish Catcher';
 require_once __DIR__ . '/includes/header.php';
 ?>
 
-<div class="glass-panel animate-modal-enter" style="width: 100%; max-width: 760px; padding: 28px; position: relative;">
+<!-- Main Hunter's Gear Glass Card -->
+<article class="glass-panel animate-modal-enter gear-container">
     <div class="top-glow-line"></div>
 
     <!-- Header Navigation -->
-    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px;">
-        <a href="dashboard.php" id="backToHubBtn" class="btn-ocean-secondary" style="height: 40px; padding: 0 16px; font-size: 13px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
+    <header class="gear-nav-row">
+        <a href="dashboard.php" id="backToHubBtn" class="btn-ocean-secondary hub-btn-nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-md">
                 <path d="m15 18-6-6 6-6" />
             </svg>
             <span>Hunter's Hub</span>
         </a>
 
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width: 22px; height: 22px; color: #67e8f9;">
+        <div class="modal-header-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="icon-xl icon-cyan">
                 <line x1="4" x2="20" y1="6" y2="6" />
                 <line x1="4" x2="20" y1="12" y2="12" />
                 <line x1="4" x2="20" y1="18" y2="18" />
@@ -55,30 +62,30 @@ require_once __DIR__ . '/includes/header.php';
                 <circle cx="15" cy="12" r="2" fill="currentColor" />
                 <circle cx="10" cy="18" r="2" fill="currentColor" />
             </svg>
-            <h2 style="font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -0.02em;">
+            <h1 class="gear-title">
                 Hunter's Gear
-            </h2>
+            </h1>
         </div>
 
-        <div style="width: 110px;" class="hide-mobile"></div>
-    </div>
+        <div class="hide-mobile"></div>
+    </header>
 
-    <div style="display: flex; flex-direction: column; gap: 20px;">
+    <div class="modal-btn-stack">
         <!-- 1. Audio & Acoustics Section -->
-        <div class="glass-subcard" style="padding: 20px;">
-            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #67e8f9; margin-bottom: 12px;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
+        <section class="glass-subcard gear-section-card">
+            <h2 class="gear-section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-md">
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
                     <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
                 </svg>
                 <span>Audio &amp; Acoustics</span>
-            </div>
+            </h2>
 
             <div>
                 <div class="toggle-row">
                     <div>
-                        <div style="font-size: 14px; font-weight: 700; color: #fff;">Ambient Ocean Soundscape</div>
-                        <div style="font-size: 12px; color: #94a3b8;">Gentle underwater resonance while navigating and hunting</div>
+                        <h3 class="gear-toggle-title">Ambient Ocean Soundscape</h3>
+                        <p class="gear-toggle-desc">Gentle underwater resonance while navigating and hunting</p>
                     </div>
                     <label class="switch">
                         <input type="checkbox" id="musicToggle" <?= $musicOn ? 'checked' : '' ?>>
@@ -88,8 +95,8 @@ require_once __DIR__ . '/includes/header.php';
 
                 <div class="toggle-row">
                     <div>
-                        <div style="font-size: 14px; font-weight: 700; color: #fff;">Arcade Sound Effects</div>
-                        <div style="font-size: 12px; color: #94a3b8;">Line cast splashes, catch chimes, level ups, and alerts</div>
+                        <h3 class="gear-toggle-title">Arcade Sound Effects</h3>
+                        <p class="gear-toggle-desc">Line cast splashes, catch chimes, level ups, and alerts</p>
                     </div>
                     <label class="switch">
                         <input type="checkbox" id="sfxToggle" <?= $sfxOn ? 'checked' : '' ?>>
@@ -97,15 +104,15 @@ require_once __DIR__ . '/includes/header.php';
                     </label>
                 </div>
             </div>
-        </div>
+        </section>
 
         <!-- 2. Ocean Difficulty Selector -->
-        <div class="glass-subcard" style="padding: 20px;">
-            <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #67e8f9; margin-bottom: 12px;">
+        <section class="glass-subcard gear-section-card">
+            <h2 class="gear-section-title">
                 Ocean Difficulty
-            </div>
+            </h2>
 
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+            <div class="difficulty-grid">
                 <?php
                 $diffs = [
                     'Easy'   => ['label' => 'Calm Reef',     'badge' => '1.5m · Slow',    'desc' => '1.5 min timer, slow fish speed, and low target marks.'],
@@ -117,60 +124,58 @@ require_once __DIR__ . '/includes/header.php';
                 ?>
                     <button
                         type="button"
-                        class="diff-select-btn diff-card <?= $isActive ? 'active-' . $dKey : '' ?>"
+                        class="diff-select-btn diff-card diff-card-btn <?= $isActive ? 'active-' . $dKey : '' ?>"
                         data-difficulty="<?= $dKey ?>"
-                        style="border-radius: 16px; padding: 16px; text-align: left;"
                     >
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                            <span style="font-weight: 800; color: #fff; font-size: 14px;"><?= $dKey ?></span>
-                            <span style="font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.1); color: #67e8f9;">
+                        <div class="diff-card-header">
+                            <span class="diff-card-title"><?= $dKey ?></span>
+                            <span class="diff-card-badge">
                                 <?= $dMeta['badge'] ?>
                             </span>
                         </div>
-                        <div style="font-size: 12px; font-weight: 600; color: rgba(103, 232, 249, 0.9); margin-bottom: 4px;">
+                        <div class="diff-card-label">
                             <?= $dMeta['label'] ?>
                         </div>
-                        <p style="font-size: 11px; color: #94a3b8; line-height: 1.4;">
+                        <p class="diff-card-desc">
                             <?= $dMeta['desc'] ?>
                         </p>
                     </button>
                 <?php endforeach; ?>
             </div>
-        </div>
+        </section>
 
         <!-- 3. Hook & Lure Rig -->
-        <div class="glass-subcard" style="padding: 20px;">
-            <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #67e8f9; margin-bottom: 12px;">
+        <section class="glass-subcard gear-section-card">
+            <h2 class="gear-section-title">
                 Hook &amp; Lure Rig
-            </div>
+            </h2>
 
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+            <div class="difficulty-grid">
                 <?php foreach ($lureStyles as $lKey => $lMeta): 
                     $isActiveLure = ($currentLure === $lKey);
                 ?>
                     <button
                         type="button"
-                        class="lure-select-btn"
+                        class="lure-select-btn lure-card <?= $isActiveLure ? 'active' : '' ?>"
                         data-lure="<?= $lKey ?>"
-                        style="padding: 14px; border-radius: 16px; border: 1px solid <?= $isActiveLure ? 'rgba(34, 211, 238, 0.7)' : 'rgba(255, 255, 255, 0.1)' ?>; background: <?= $isActiveLure ? 'rgba(34, 211, 238, 0.18)' : 'rgba(3, 15, 32, 0.4)' ?>; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all 0.2s ease;"
                     >
-                        <span style="width: 32px; height: 32px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(2, 11, 24, 0.8); box-shadow: 0 0 14px <?= $lMeta['glow'] ?>; display: flex; align-items: center; justify-content: center; shrink: 0;">
-                            <span style="width: 14px; height: 14px; border-radius: 50%; background: <?= $lMeta['hex'] ?>;"></span>
+                        <span class="lure-icon-frame">
+                            <span class="lure-dot lure-dot-<?= $lMeta['class'] ?>"></span>
                         </span>
-                        <div style="text-align: left;">
-                            <div style="font-size: 14px; font-weight: 700; color: #fff;"><?= $lMeta['name'] ?></div>
-                            <div class="lure-status" style="font-size: 11px; color: #94a3b8;">
+                        <div>
+                            <div class="lure-name"><?= $lMeta['name'] ?></div>
+                            <div class="lure-status">
                                 <?= $isActiveLure ? 'Equipped' : 'Select rig' ?>
                             </div>
                         </div>
                     </button>
                 <?php endforeach; ?>
             </div>
-        </div>
+        </section>
     </div>
-</div>
+</article>
 
-<!-- Event-Driven Settings Persistence Script -->
+<!-- Theme B (Event-Driven Programming): Settings Persistence Script -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const musicToggle = document.getElementById('musicToggle');
@@ -239,12 +244,10 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => {
             if (window.soundEngine) window.soundEngine.playClick();
             lureButtons.forEach(b => {
-                b.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                b.style.background = 'rgba(3, 15, 32, 0.4)';
+                b.classList.remove('active');
                 b.querySelector('.lure-status').textContent = 'Select rig';
             });
-            btn.style.borderColor = 'rgba(34, 211, 238, 0.7)';
-            btn.style.background = 'rgba(34, 211, 238, 0.18)';
+            btn.classList.add('active');
             btn.querySelector('.lure-status').textContent = 'Equipped';
             currentSettings.lureStyle = btn.getAttribute('data-lure');
             saveSettings();

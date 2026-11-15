@@ -3,12 +3,15 @@
  * Hunter Sign In View
  * File: frontend/login.php
  * 
- * Part of Virtual Identity theme: authenticates existing hunters.
+ * Demonstrates:
+ * - Theme D (Virtual Identity): Secure authentication gate for registered hunters.
+ * - Theme A (Low Coupling): Presentation separated into css/style.css with ZERO inline CSS.
+ * - Semantic HTML5: <header>, <form>, <label>, <input>, <button>, <footer>.
  */
 
 require_once __DIR__ . '/../backend/config/database.php';
 
-// If already logged in, redirect to dashboard
+// If hunter is already authenticated in session, forward to dashboard
 if (isLoggedIn()) {
     header('Location: dashboard.php');
     exit;
@@ -21,12 +24,13 @@ $message = $_GET['message'] ?? '';
 require_once __DIR__ . '/includes/header.php';
 ?>
 
-<div class="glass-panel animate-modal-enter" style="width: 100%; max-width: 460px; padding: 36px 32px; display: flex; flex-direction: column; align-items: center;">
+<!-- Main Login Glass Card -->
+<section class="glass-panel animate-modal-enter auth-card">
     <div class="top-glow-line"></div>
 
-    <!-- Brand Crest & Header -->
-    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 8px;">
-        <svg viewBox="0 0 64 64" fill="none" style="width: 48px; height: 48px; filter: drop-shadow(0 0 16px rgba(34,211,238,0.45));" aria-hidden="true">
+    <!-- Header & Brand Logo -->
+    <header class="auth-header">
+        <svg viewBox="0 0 64 64" fill="none" class="auth-logo-svg" aria-hidden="true">
             <defs>
                 <linearGradient id="crestRing" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
                     <stop offset="0%" stop-color="#67e8f9" />
@@ -47,16 +51,12 @@ require_once __DIR__ . '/includes/header.php';
             <circle cx="24.2" cy="34.8" r="0.8" fill="#ffffff" />
         </svg>
         <div>
-            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.24em; color: rgba(103, 232, 249, 0.8);">
-                Deep Sea Arcade
-            </div>
-            <h1 style="font-size: 32px; font-weight: 800; color: #fff; line-height: 1.1;">
-                Fish Catcher
-            </h1>
+            <p class="auth-badge">Deep Sea Arcade</p>
+            <h1 class="auth-title">Fish Catcher</h1>
         </div>
-    </div>
+    </header>
 
-    <p style="font-size: 14px; color: rgba(203, 213, 225, 0.85); margin-bottom: 24px; text-align: center;">
+    <p class="auth-subtitle">
         Sign in with your registered hunter account to play.
     </p>
 
@@ -69,8 +69,9 @@ require_once __DIR__ . '/includes/header.php';
         <div class="alert-success"><?= htmlspecialchars($message) ?></div>
     <?php endif; ?>
 
-    <!-- Login Form -->
-    <form action="../backend/actions/login_action.php" method="POST" id="loginForm" style="width: 100%; display: flex; flex-direction: column; gap: 16px;">
+    <!-- Login Form (Submits to backend/actions/login_action.php) -->
+    <form action="../backend/actions/login_action.php" method="POST" id="loginForm" class="auth-form">
+        <!-- Username or Email Field -->
         <div class="form-group">
             <label for="login-identifier" class="form-label">Username or Email</label>
             <div class="input-wrapper">
@@ -89,6 +90,7 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         </div>
 
+        <!-- Password Field with Visibility Toggle -->
         <div class="form-group">
             <label for="login-password" class="form-label">Password</label>
             <div class="input-wrapper">
@@ -110,7 +112,7 @@ require_once __DIR__ . '/includes/header.php';
                     class="toggle-password-btn"
                     aria-label="Toggle password visibility"
                 >
-                    <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;">
+                    <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="icon-md">
                         <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
                         <circle cx="12" cy="12" r="3" />
                     </svg>
@@ -118,23 +120,25 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         </div>
 
-        <button type="submit" id="submitBtn" class="btn-ocean-primary" style="width: 100%; height: 48px; margin-top: 8px; font-size: 15px;">
-            <svg viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px;">
+        <!-- Submit Button -->
+        <button type="submit" id="submitBtn" class="btn-ocean-primary auth-submit-btn">
+            <svg viewBox="0 0 24 24" fill="currentColor" class="icon-md">
                 <path d="M7.5 5.6a1.4 1.4 0 0 1 2.13-1.19l10.2 6.4a1.4 1.4 0 0 1 0 2.38l-10.2 6.4A1.4 1.4 0 0 1 7.5 18.4V5.6Z" />
             </svg>
             <span>Dive In</span>
         </button>
     </form>
 
-    <p style="margin-top: 24px; font-size: 13px; color: rgba(203, 213, 225, 0.8);">
+    <!-- Navigation Link to Registration -->
+    <footer class="auth-footer-text">
         New to the fleet?
-        <a href="register.php" style="color: #67e8f9; font-weight: 700; text-decoration: underline; text-underline-offset: 4px;">
+        <a href="register.php" class="auth-link">
             Create Hunter Profile
         </a>
-    </p>
-</div>
+    </footer>
+</section>
 
-<!-- Event-Driven Password Toggle Script -->
+<!-- Theme B (Event-Driven Programming): Password Toggle Event Handler -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const passwordInput = document.getElementById('login-password');
@@ -142,13 +146,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const eyeIcon = document.getElementById('eyeIcon');
     const form = document.getElementById('loginForm');
 
-    // Click event on toggle button
+    // Event listener: Toggle password visibility
     toggleBtn.addEventListener('click', () => {
         if (window.soundEngine) window.soundEngine.playClick();
         const isPassword = passwordInput.getAttribute('type') === 'password';
         passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
         
-        // Update eye icon SVG
+        // Update SVG icon shape
         if (isPassword) {
             eyeIcon.innerHTML = '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><line x1="2" x2="22" y1="2" y2="22" />';
         } else {
@@ -156,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Event listener: Form submission sound feedback
     form.addEventListener('submit', () => {
         if (window.soundEngine) window.soundEngine.playClick();
     });

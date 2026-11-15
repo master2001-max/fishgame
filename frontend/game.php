@@ -1,91 +1,103 @@
 <?php
 /**
  * Game Arena View
- * File: game.php
+ * File: frontend/game.php
  * 
  * Demonstrates:
- * - HTML5 Canvas Arcade Rendering with Vanilla JavaScript.
- * - Event-Driven Programming: Canvas input, keyboard controls, audio hooks.
- * - Third-Party Interoperability: Marc Conrad Oracle riddle modal.
- * - Virtual Identity: Loads player difficulty, level progress, and sessions.
+ * - HTML5 Canvas 60 FPS deep sea arcade simulation.
+ * - Theme B (Event-Driven Programming): Keyboard & Mouse events for boat steering, hook casting, pause.
+ * - Theme C (Interoperability): Procedural riddles from Dr. Marc Conrad's Fish API on catching the Golden Oracle fish.
+ * - Theme A (Low Coupling): Presentation controlled 100% by css/style.css with ZERO inline CSS.
  */
 
 require_once __DIR__ . '/../backend/config/database.php';
-requireAuth();
+requireAuth(); // Guard: session verification
 
 $userId = (int)$_SESSION['user_id'];
 $pdo = getDBConnection();
 
+// Fetch hunter data
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = :id LIMIT 1");
 $stmt->execute([':id' => $userId]);
 $user = $stmt->fetch();
 
-$progress = json_decode($user['progress'] ?? '{}', true) ?? getDefaultProgress();
-$settings = json_decode($user['settings'] ?? '{}', true) ?? getDefaultSettings();
-
-$isResume = !empty($_GET['resume']);
-$isFresh  = !empty($_GET['fresh']);
-
-if ($isFresh) {
-    // Player explicitly chose to start fresh, clear saved game session
-    $clear = $pdo->prepare("UPDATE users SET saved_game = NULL WHERE id = :id");
-    $clear->execute([':id' => $userId]);
-    $user['saved_game'] = null;
+if (!$user) {
+    header('Location: logout.php');
+    exit;
 }
 
-$savedGame = ($isResume && !empty($user['saved_game'])) ? json_decode($user['saved_game'], true) : null;
+$settings = json_decode($user['settings'], true) ?? getDefaultSettings();
+$progress = json_decode($user['progress'], true) ?? getDefaultProgress();
+$savedGame = $user['saved_game'] ? json_decode($user['saved_game'], true) : null;
 
-$activeDifficulty = $savedGame['difficulty'] ?? ($settings['difficulty'] ?? ($user['difficulty'] ?? 'Easy'));
+// Determine active difficulty & level
+$activeDifficulty = $settings['difficulty'] ?? ($user['difficulty'] ?? 'Easy');
 if (!in_array($activeDifficulty, ['Easy', 'Normal', 'Hard'])) {
     $activeDifficulty = 'Easy';
 }
 
 $diffProgress = $progress[$activeDifficulty] ?? ['currentLevel' => 1, 'completed' => []];
-$level = $savedGame['level'] ?? (int)$diffProgress['currentLevel'];
-$level = max(1, min(6, $level));
+$level = (int)$diffProgress['currentLevel'];
 
-// Level target marks per difficulty
-$targets = [
+// Check if user requested a fresh start or resume
+$isFresh = isset($_GET['fresh']);
+$isResume = isset($_GET['resume']);
+
+$resumeSession = null;
+if ($isResume && $savedGame && ($savedGame['difficulty'] ?? '') === $activeDifficulty) {
+    $resumeSession = $savedGame;
+    $level = (int)$savedGame['level'];
+} elseif ($isFresh && $savedGame) {
+    // Clear saved snapshot
+    $clearStmt = $pdo->prepare("UPDATE users SET saved_game = NULL WHERE id = :id");
+    $clearStmt->execute([':id' => $userId]);
+}
+
+// Level targets per difficulty
+$levelTargets = [
     'Easy'   => [350, 500, 650, 850, 1050, 1250],
     'Normal' => [800, 1100, 1400, 1700, 2000, 2300],
     'Hard'   => [1400, 1800, 2150, 2500, 2850, 3200],
 ];
-$targetMarks = $targets[$activeDifficulty][$level - 1] ?? 500;
+$targetMarks = $levelTargets[$activeDifficulty][$level - 1] ?? 500;
 
-$pageTitle = "Fish Catcher - {$activeDifficulty} Lv. {$level}";
+$pageTitle = "Mission Lv. {$level} ({$activeDifficulty}) - Fish Catcher";
 require_once __DIR__ . '/includes/header.php';
 ?>
 
-<!-- Pass PHP Session & Game Configuration to Vanilla JavaScript -->
+<!-- Pass configuration to game.js engine -->
 <script>
 window.GAME_BOOTSTRAP = {
-    userId: <?= $userId ?>,
-    difficulty: "<?= $activeDifficulty ?>",
-    level: <?= $level ?>,
-    targetMarks: <?= $targetMarks ?>,
-    bestScore: <?= (int)$user['score'] ?>,
-    resumeSession: <?= $savedGame ? json_encode($savedGame) : 'null' ?>,
-    settings: <?= json_encode($settings) ?>
+    difficulty: <?= json_encode($activeDifficulty) ?>,
+    level: <?= (int)$level ?>,
+    targetMarks: <?= (int)$targetMarks ?>,
+    settings: <?= json_encode($settings) ?>,
+    user: {
+        id: <?= (int)$user['id'] ?>,
+        name: <?= json_encode($user['name']) ?>,
+        score: <?= (int)$user['score'] ?>
+    },
+    resumeSession: <?= json_encode($resumeSession) ?>
 };
 </script>
 
 <div class="game-viewport">
-    <div class="glass-panel" style="padding: 20px; position: relative;">
+    <section class="glass-panel game-panel">
         <div class="top-glow-line"></div>
 
         <!-- Target-Based HUD Bar -->
-        <div class="game-hud">
+        <header class="game-hud">
             <div class="hud-left">
-                <button type="button" id="pauseBtn" class="btn-ocean-secondary" style="height: 40px; padding: 0 16px; font-size: 13px; font-weight: 700;">
-                    <svg viewBox="0 0 24 24" fill="currentColor" style="width: 14px; height: 14px; color: #67e8f9;">
+                <button type="button" id="pauseBtn" class="btn-ocean-secondary hud-icon-btn">
+                    <svg viewBox="0 0 24 24" fill="currentColor" class="icon-sm icon-cyan">
                         <rect x="6" y="4" width="4.5" height="16" rx="1.5" />
                         <rect x="13.5" y="4" width="4.5" height="16" rx="1.5" />
                     </svg>
                     <span>Pause</span>
                 </button>
 
-                <button type="button" id="muteBtn" class="btn-ocean-secondary" style="width: 40px; height: 40px; padding: 0;" aria-label="Toggle Audio">
-                    <svg id="muteIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px; color: #67e8f9;">
+                <button type="button" id="muteBtn" class="btn-ocean-secondary hud-icon-btn" aria-label="Toggle Audio">
+                    <svg id="muteIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-md icon-cyan">
                         <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
                         <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
                     </svg>
@@ -99,17 +111,15 @@ window.GAME_BOOTSTRAP = {
                 </div>
 
                 <div class="glass-subcard target-progress-box">
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; font-weight: 700;">
-                        <span style="color: #94a3b8; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;">
-                            Marks Target
-                        </span>
-                        <span class="font-mono tabular-nums" style="color: #fff;">
-                            <span id="hudScore" style="color: #67e8f9; font-weight: 800;">0</span>
-                            <span style="color: #64748b;"> / <?= number_format($targetMarks) ?></span>
+                    <div class="target-progress-header">
+                        <span class="target-label">Marks Target</span>
+                        <span class="font-mono tabular-nums">
+                            <span id="hudScore" class="target-score-current">0</span>
+                            <span class="target-score-max"> / <?= number_format($targetMarks) ?></span>
                         </span>
                     </div>
                     <div class="progress-bar-track">
-                        <div id="hudProgressBar" class="progress-bar-fill" style="width: 0%;"></div>
+                        <div id="hudProgressBar" class="progress-bar-fill"></div>
                     </div>
                 </div>
             </div>
@@ -118,7 +128,7 @@ window.GAME_BOOTSTRAP = {
             <div id="hudTimer" class="timer-box font-mono tabular-nums">
                 01:30
             </div>
-        </div>
+        </header>
 
         <!-- HTML5 Canvas Game Arena -->
         <div class="canvas-wrapper">
@@ -131,39 +141,39 @@ window.GAME_BOOTSTRAP = {
         <!-- ========================================================
              MODAL 1: IN-GAME PAUSE MODAL
              ======================================================== -->
-        <div id="pauseModal" class="modal-overlay" style="display: none;">
+        <div id="pauseModal" class="modal-overlay">
             <div class="modal-card animate-modal-enter">
                 <div class="top-glow-line"></div>
                 
-                <div class="modal-icon-circle" style="background: rgba(34, 211, 238, 0.15); border: 1px solid rgba(103, 232, 249, 0.3); color: #67e8f9;">
-                    <svg viewBox="0 0 24 24" fill="currentColor" style="width: 22px; height: 22px;">
+                <div class="modal-icon-circle modal-icon-pause">
+                    <svg viewBox="0 0 24 24" fill="currentColor" class="icon-xl">
                         <rect x="6" y="4" width="4.5" height="16" rx="1.5" />
                         <rect x="13.5" y="4" width="4.5" height="16" rx="1.5" />
                     </svg>
                 </div>
                 
-                <h2 style="font-size: 24px; font-weight: 800; color: #fff; margin-bottom: 4px;">Mission Paused</h2>
-                <p style="font-size: 12px; color: #94a3b8; margin-bottom: 24px;">
+                <h2 class="modal-title">Mission Paused</h2>
+                <p class="modal-subtitle">
                     Take a breather or adjust your rig before diving back in.
                 </p>
 
-                <div style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
-                    <button type="button" id="resumeMissionBtn" class="btn-ocean-primary" style="width: 100%; height: 44px; font-size: 14px;">
-                        <svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px;">
+                <div class="modal-btn-stack">
+                    <button type="button" id="resumeMissionBtn" class="btn-ocean-primary hub-btn-nav">
+                        <svg viewBox="0 0 24 24" fill="currentColor" class="icon-md">
                             <path d="M7.5 5.6a1.4 1.4 0 0 1 2.13-1.19l10.2 6.4a1.4 1.4 0 0 1 0 2.38l-10.2 6.4A1.4 1.4 0 0 1 7.5 18.4V5.6Z" />
                         </svg>
                         <span>Resume Mission</span>
                     </button>
 
-                    <button type="button" id="restartMissionBtn" class="btn-ocean-secondary" style="width: 100%; height: 44px; font-size: 14px;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px; color: #67e8f9;">
+                    <button type="button" id="restartMissionBtn" class="btn-ocean-secondary hub-btn-nav">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-md icon-cyan">
                             <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
                         </svg>
                         <span>Restart Mission</span>
                     </button>
 
-                    <a href="gear.php" class="btn-ocean-secondary" style="width: 100%; height: 44px; font-size: 14px;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px; color: #67e8f9;">
+                    <a href="gear.php" class="btn-ocean-secondary hub-btn-nav">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="icon-md icon-cyan">
                             <line x1="4" x2="20" y1="6" y2="6" />
                             <line x1="4" x2="20" y1="12" y2="12" />
                             <line x1="4" x2="20" y1="18" y2="18" />
@@ -174,11 +184,11 @@ window.GAME_BOOTSTRAP = {
                         <span>Hunter's Gear</span>
                     </a>
 
-                    <button type="button" id="saveAndExitBtn" class="btn-danger" style="width: 100%; height: 44px; font-size: 14px;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
+                    <button type="button" id="saveAndExitBtn" class="btn-danger hub-btn-nav">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" class="icon-md">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                             <polyline points="16 17 21 12 16 7" />
-                            <line x1="21" x2="9" y1="12" y2="12" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
                         </svg>
                         <span>Save &amp; Return to Hub</span>
                     </button>
@@ -189,47 +199,47 @@ window.GAME_BOOTSTRAP = {
         <!-- ========================================================
              MODAL 2: MARC CONRAD FISH API ORACLE PUZZLE MODAL
              ======================================================== -->
-        <div id="oracleModal" class="modal-overlay" style="display: none;">
+        <div id="oracleModal" class="modal-overlay">
             <div class="modal-card oracle-modal-card animate-modal-enter">
                 <div class="top-glow-amber"></div>
 
-                <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 6px;">
-                    <div style="padding: 8px; border-radius: 12px; background: rgba(251, 191, 36, 0.2); border: 1px solid rgba(251, 191, 36, 0.4); box-shadow: 0 0 12px rgba(251, 191, 36, 0.5);">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: #fbbf24;">
+                <div class="modal-header-row">
+                    <div class="oracle-badge-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-lg icon-amber">
                             <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
                         </svg>
                     </div>
-                    <h2 style="font-size: 22px; font-weight: 900; color: #fff; letter-spacing: -0.02em;">
+                    <h2 class="oracle-modal-title">
                         Golden Oracle Challenge
                     </h2>
                 </div>
 
-                <p style="font-size: 13px; color: rgba(254, 240, 138, 0.9); font-weight: 500; margin-bottom: 16px;">
-                    To continue and claim <strong style="color: #fbbf24;">+1,500 bonus marks</strong>, give the correct answer!
+                <p class="oracle-modal-subtitle">
+                    Count the fish in the picture to claim <strong>+200 Bonus Marks</strong> from Dr. Marc Conrad's API!
                 </p>
 
                 <!-- Oracle Riddle Viewport -->
-                <div id="oracleLoading" style="display: none; padding: 36px 0; flex-direction: column; align-items: center; gap: 12px;">
-                    <div class="animate-spin" style="width: 36px; height: 36px; border: 3px solid rgba(251, 191, 36, 0.3); border-top-color: #fbbf24; border-radius: 50%;"></div>
-                    <span style="font-size: 12px; color: rgba(254, 240, 138, 0.85); font-weight: 600;">
+                <div id="oracleLoading" class="oracle-loading-box">
+                    <div class="animate-spin oracle-spinner"></div>
+                    <span class="oracle-loading-text">
                         Summoning Oracle Riddle from Marc Conrad API...
                     </span>
                 </div>
 
-                <div id="oracleContent" style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+                <div id="oracleContent" class="oracle-content-wrapper">
                     <div class="aquarium-frame">
                         <img id="oracleImage" src="" alt="Fish Counting Riddle">
                     </div>
 
                     <!-- Result Feedback Banner -->
-                    <div id="oracleResultBanner" style="display: none; width: 100%; padding: 12px; border-radius: 14px; text-align: center; margin-bottom: 12px;">
-                        <div id="oracleResultTitle" style="font-size: 14px; font-weight: 800; margin-bottom: 2px;"></div>
-                        <div id="oracleResultMessage" style="font-size: 12px; opacity: 0.9;"></div>
+                    <div id="oracleResultBanner" class="oracle-result-banner">
+                        <div id="oracleResultTitle" class="oracle-result-title"></div>
+                        <div id="oracleResultMessage" class="oracle-result-message"></div>
                     </div>
 
                     <!-- Answer Submission Form -->
-                    <form id="oracleForm" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                        <label for="oracleAnswerInput" style="font-size: 12px; color: #67e8f9; font-weight: 600;">
+                    <form id="oracleForm" class="oracle-form-wrapper">
+                        <label for="oracleAnswerInput" class="oracle-question-label">
                             How many fish are in the picture? (0 - 9)
                         </label>
                         <div class="oracle-input-row">
@@ -250,9 +260,9 @@ window.GAME_BOOTSTRAP = {
                     </form>
                 </div>
 
-                <div style="margin-top: 16px; width: 100%; display: flex; justify-content: flex-end;">
-                    <button type="button" id="closeOracleBtn" class="btn-ocean-secondary" style="height: 36px; padding: 0 16px; font-size: 12px; border-radius: 12px;">
-                        Resume Fishing
+                <div class="oracle-footer-btn-row">
+                    <button type="button" id="closeOracleBtn" class="btn-ocean-secondary hub-logout-btn">
+                        Continue Fishing
                     </button>
                 </div>
             </div>
@@ -261,13 +271,13 @@ window.GAME_BOOTSTRAP = {
         <!-- ========================================================
              MODAL 3: LEVEL COMPLETE / TIME'S UP OUTCOME MODAL
              ======================================================== -->
-        <div id="outcomeModal" class="modal-overlay" style="display: none;">
+        <div id="outcomeModal" class="modal-overlay">
             <div class="modal-card animate-modal-enter">
                 <div class="top-glow-line"></div>
 
                 <!-- Personal Best Pill -->
-                <div id="highScorePill" style="display: none; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; background: rgba(251, 191, 36, 0.2); border: 1px solid rgba(251, 191, 36, 0.45); color: #fef08a; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
+                <div id="highScorePill" class="high-score-pill">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-sm">
                         <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
                     </svg>
                     <span>New Personal Best!</span>
@@ -275,57 +285,57 @@ window.GAME_BOOTSTRAP = {
 
                 <div id="outcomeIconCircle" class="modal-icon-circle"></div>
 
-                <h2 id="outcomeTitle" style="font-size: 26px; font-weight: 900; color: #fff; margin-bottom: 4px;"></h2>
-                <p id="outcomeSubtitle" style="font-size: 12px; color: #94a3b8; margin-bottom: 20px;"></p>
+                <h2 id="outcomeTitle" class="modal-title"></h2>
+                <p id="outcomeSubtitle" class="modal-subtitle"></p>
 
                 <!-- Collected Marks Card -->
-                <div class="glass-subcard" style="width: 100%; padding: 16px; margin-bottom: 16px;">
-                    <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; font-weight: 700;">
+                <div class="glass-subcard collected-marks-card">
+                    <div class="collected-marks-label">
                         Marks Collected
                     </div>
-                    <div class="font-mono tabular-nums" style="font-size: 36px; font-weight: 900; color: #67e8f9; margin-top: 2px;">
+                    <div class="font-mono tabular-nums collected-marks-val">
                         <span id="outcomeScoreVal">0</span>
-                        <span style="font-size: 16px; color: #64748b; font-weight: 600;"> / <?= number_format($targetMarks) ?></span>
+                        <span class="collected-marks-target"> / <?= number_format($targetMarks) ?></span>
                     </div>
-                    <div id="outcomeShortfallMsg" style="font-size: 11px; color: #fb7185; margin-top: 4px; display: none;"></div>
+                    <div id="outcomeShortfallMsg" class="shortfall-msg"></div>
                 </div>
 
                 <!-- Stats Grid: Time Left & Catches -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-bottom: 20px;">
-                    <div class="glass-subcard" style="padding: 10px;">
-                        <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8;">Time Left</div>
-                        <div id="outcomeTimeLeftVal" class="font-mono tabular-nums" style="font-size: 16px; font-weight: 800; color: #fff;">00:00</div>
+                <div class="stats-two-col">
+                    <div class="glass-subcard stat-tile">
+                        <div class="stat-tile-label">Time Left</div>
+                        <div id="outcomeTimeLeftVal" class="font-mono tabular-nums stat-tile-val">00:00</div>
                     </div>
-                    <div class="glass-subcard" style="padding: 10px;">
-                        <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8;">Catches</div>
-                        <div id="outcomeCatchesVal" class="font-mono tabular-nums" style="font-size: 16px; font-weight: 800; color: #67e8f9;">0</div>
+                    <div class="glass-subcard stat-tile">
+                        <div class="stat-tile-label">Catches</div>
+                        <div id="outcomeCatchesVal" class="font-mono tabular-nums stat-tile-val icon-cyan">0</div>
                     </div>
                 </div>
 
                 <!-- Outcome Action Buttons -->
-                <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+                <div class="modal-btn-stack">
                     <!-- Consult Marc Conrad Fish Oracle Button -->
-                    <button type="button" id="consultOracleBtn" style="display: none; width: 100%; height: 42px; border-radius: 12px; font-size: 12px; font-weight: 800; background: rgba(251, 191, 36, 0.2); color: #fde047; border: 1px solid rgba(251, 191, 36, 0.45); cursor: pointer; align-items: center; justify-content: center; gap: 8px;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">
+                    <button type="button" id="consultOracleBtn" class="consult-oracle-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-sm">
                             <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
                         </svg>
-                        <span>Consult Dr. Marc Conrad's Fish Oracle (+1500 Marks)</span>
+                        <span>Consult Dr. Marc Conrad's Fish Oracle (+200 Marks)</span>
                     </button>
 
                     <!-- Next Level or Retry Button -->
-                    <button type="button" id="primaryOutcomeBtn" class="btn-ocean-primary" style="width: 100%; height: 44px; font-size: 14px;">
-                        <svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px;">
+                    <button type="button" id="primaryOutcomeBtn" class="btn-ocean-primary hub-btn-nav">
+                        <svg viewBox="0 0 24 24" fill="currentColor" class="icon-md">
                             <path d="M7.5 5.6a1.4 1.4 0 0 1 2.13-1.19l10.2 6.4a1.4 1.4 0 0 1 0 2.38l-10.2 6.4A1.4 1.4 0 0 1 7.5 18.4V5.6Z" />
                         </svg>
                         <span id="primaryOutcomeBtnText">Next Level</span>
                     </button>
 
-                    <div style="display: flex; gap: 10px; width: 100%;">
-                        <button type="button" id="replayLevelBtn" class="btn-ocean-secondary" style="flex: 1; height: 40px; font-size: 13px;">
+                    <div class="action-three-col">
+                        <button type="button" id="replayLevelBtn" class="btn-ocean-secondary action-flex-btn">
                             Replay
                         </button>
-                        <a href="leaderboard.php" class="btn-ocean-secondary" style="flex: 1; height: 40px; font-size: 13px;">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px; color: #fbbf24;">
+                        <a href="leaderboard.php" class="btn-ocean-secondary action-flex-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="icon-sm icon-amber">
                                 <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
                                 <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
                                 <path d="M4 22h16" />
@@ -333,16 +343,16 @@ window.GAME_BOOTSTRAP = {
                                 <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
                                 <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
                             </svg>
-                            <span>Top Hunters</span>
+                            <span>Leaderboard</span>
                         </a>
-                        <a href="dashboard.php" class="btn-ocean-secondary" style="flex: 1; height: 40px; font-size: 13px;">
+                        <a href="dashboard.php" class="btn-ocean-secondary action-flex-btn">
                             Menu
                         </a>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 </div>
 
 <!-- Game Engine Scripts -->

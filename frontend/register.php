@@ -3,12 +3,15 @@
  * Hunter Registration View
  * File: frontend/register.php
  * 
- * Part of Virtual Identity theme: enlists new hunters into the system.
+ * Demonstrates:
+ * - Theme D (Virtual Identity): Enlisting new players with secure bcrypt password hashing.
+ * - Theme A (Low Coupling): Presentation separated into css/style.css with ZERO inline CSS.
+ * - Semantic HTML5: <section>, <header>, <form>, <label>, <input>, <button>, <footer>.
  */
 
 require_once __DIR__ . '/../backend/config/database.php';
 
-// If already logged in, redirect to dashboard
+// If hunter is already authenticated in session, forward to dashboard
 if (isLoggedIn()) {
     header('Location: dashboard.php');
     exit;
@@ -20,12 +23,13 @@ $error = $_GET['error'] ?? '';
 require_once __DIR__ . '/includes/header.php';
 ?>
 
-<div class="glass-panel animate-modal-enter" style="width: 100%; max-width: 460px; padding: 36px 32px; display: flex; flex-direction: column; align-items: center;">
+<!-- Main Registration Glass Card -->
+<section class="glass-panel animate-modal-enter auth-card">
     <div class="top-glow-line"></div>
 
-    <!-- Brand Crest & Header -->
-    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 8px;">
-        <svg viewBox="0 0 64 64" fill="none" style="width: 48px; height: 48px; filter: drop-shadow(0 0 16px rgba(34,211,238,0.45));" aria-hidden="true">
+    <!-- Header & Brand Logo -->
+    <header class="auth-header">
+        <svg viewBox="0 0 64 64" fill="none" class="auth-logo-svg" aria-hidden="true">
             <defs>
                 <linearGradient id="crestRing" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
                     <stop offset="0%" stop-color="#67e8f9" />
@@ -46,26 +50,23 @@ require_once __DIR__ . '/includes/header.php';
             <circle cx="24.2" cy="34.8" r="0.8" fill="#ffffff" />
         </svg>
         <div>
-            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.24em; color: rgba(103, 232, 249, 0.8);">
-                Enlist Today
-            </div>
-            <h1 style="font-size: 32px; font-weight: 800; color: #fff; line-height: 1.1;">
-                Become a Hunter
-            </h1>
+            <p class="auth-badge">Enlist Today</p>
+            <h1 class="auth-title">Become a Hunter</h1>
         </div>
-    </div>
+    </header>
 
-    <p style="font-size: 14px; color: rgba(203, 213, 225, 0.85); margin-bottom: 24px; text-align: center;">
+    <p class="auth-subtitle">
         Register your account to save level progress and compete for high scores.
     </p>
 
-    <!-- Error Alert -->
+    <!-- Error Notification Banner -->
     <?php if (!empty($error)): ?>
         <div class="alert-error"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
-    <!-- Register Form -->
-    <form action="../backend/actions/register_action.php" method="POST" id="registerForm" style="width: 100%; display: flex; flex-direction: column; gap: 16px;">
+    <!-- Registration Form (Submits to backend/actions/register_action.php) -->
+    <form action="../backend/actions/register_action.php" method="POST" id="registerForm" class="auth-form">
+        <!-- Hunter Name Input -->
         <div class="form-group">
             <label for="register-username" class="form-label">Hunter Name</label>
             <div class="input-wrapper">
@@ -86,6 +87,7 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         </div>
 
+        <!-- Email Address Input -->
         <div class="form-group">
             <label for="register-email" class="form-label">Email Address</label>
             <div class="input-wrapper">
@@ -104,6 +106,7 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         </div>
 
+        <!-- Password Input with Visibility Toggle -->
         <div class="form-group">
             <label for="register-password" class="form-label">Password</label>
             <div class="input-wrapper">
@@ -126,7 +129,7 @@ require_once __DIR__ . '/includes/header.php';
                     class="toggle-password-btn"
                     aria-label="Toggle password visibility"
                 >
-                    <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;">
+                    <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="icon-md">
                         <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
                         <circle cx="12" cy="12" r="3" />
                     </svg>
@@ -134,23 +137,25 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         </div>
 
-        <button type="submit" id="submitBtn" class="btn-ocean-primary" style="width: 100%; height: 48px; margin-top: 8px; font-size: 15px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;">
+        <!-- Submit Button -->
+        <button type="submit" id="submitBtn" class="btn-ocean-primary auth-submit-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-md">
                 <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
             </svg>
             <span>Join the Hunt</span>
         </button>
     </form>
 
-    <p style="margin-top: 24px; font-size: 13px; color: rgba(203, 213, 225, 0.8);">
+    <!-- Navigation Link to Sign In -->
+    <footer class="auth-footer-text">
         Already registered?
-        <a href="login.php" style="color: #67e8f9; font-weight: 700; text-decoration: underline; text-underline-offset: 4px;">
+        <a href="login.php" class="auth-link">
             Sign In
         </a>
-    </p>
-</div>
+    </footer>
+</section>
 
-<!-- Event-Driven Password Toggle Script -->
+<!-- Theme B (Event-Driven Programming): Password Toggle Event Handler -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const passwordInput = document.getElementById('register-password');
@@ -158,11 +163,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const eyeIcon = document.getElementById('eyeIcon');
     const form = document.getElementById('registerForm');
 
+    // Event listener: Toggle password visibility
     toggleBtn.addEventListener('click', () => {
         if (window.soundEngine) window.soundEngine.playClick();
         const isPassword = passwordInput.getAttribute('type') === 'password';
         passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
         
+        // Update SVG icon shape
         if (isPassword) {
             eyeIcon.innerHTML = '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><line x1="2" x2="22" y1="2" y2="22" />';
         } else {
@@ -170,6 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Event listener: Form submission sound feedback
     form.addEventListener('submit', () => {
         if (window.soundEngine) window.soundEngine.playClick();
     });
