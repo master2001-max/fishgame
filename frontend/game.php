@@ -96,11 +96,9 @@ window.GAME_BOOTSTRAP = {
                     <span>Pause</span>
                 </button>
 
-                <button type="button" id="muteBtn" class="btn-ocean-secondary hud-icon-btn" aria-label="Toggle Audio">
-                    <svg id="muteIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-md icon-cyan">
-                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-                    </svg>
+                <button type="button" id="muteBtn" class="btn-ocean-secondary hud-sound-btn" aria-label="Toggle Audio">
+                    <span id="muteIconWrap"></span>
+                    <span id="muteLabel" class="hud-sound-text">Audio: ON</span>
                 </button>
             </div>
 
@@ -314,14 +312,6 @@ window.GAME_BOOTSTRAP = {
 
                 <!-- Outcome Action Buttons -->
                 <div class="modal-btn-stack">
-                    <!-- Consult Marc Conrad Fish Oracle Button -->
-                    <button type="button" id="consultOracleBtn" class="consult-oracle-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-sm">
-                            <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
-                        </svg>
-                        <span>Consult Dr. Marc Conrad's Fish Oracle (+200 Marks)</span>
-                    </button>
-
                     <!-- Next Level or Retry Button -->
                     <button type="button" id="primaryOutcomeBtn" class="btn-ocean-primary hub-btn-nav">
                         <svg viewBox="0 0 24 24" fill="currentColor" class="icon-md">
@@ -355,7 +345,11 @@ window.GAME_BOOTSTRAP = {
     </section>
 </div>
 
-<!-- Game Engine Scripts -->
+<!-- Web Audio Synthesizer Sound Engine -->
+<script src="js/sound.js"></script>
+<!-- Developer Fish & Balance Configuration -->
+<script src="js/fish_config.js"></script>
+<!-- Game Simulation Engine -->
 <script src="js/game.js"></script>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

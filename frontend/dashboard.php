@@ -117,7 +117,7 @@ require_once __DIR__ . '/includes/header.php';
                 ?>
                 <button
                     type="button"
-                    class="difficulty-card <?= $isSelected ? 'selected' : '' ?>"
+                    class="difficulty-card diff-card <?= $isSelected ? 'selected active-' . $diff : '' ?>"
                     data-difficulty="<?= $diff ?>"
                 >
                     <div class="diff-header">
@@ -238,16 +238,21 @@ require_once __DIR__ . '/includes/header.php';
 <!-- Theme B (Event-Driven Programming): Difficulty Switcher Script -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const diffButtons = document.querySelectorAll('.difficulty-card');
+    const diffButtons = document.querySelectorAll('.difficulty-card, .diff-card');
 
     diffButtons.forEach((btn) => {
         btn.addEventListener('click', async () => {
-            if (window.soundEngine) window.soundEngine.playClick();
+            if (window.soundEngine) {
+                window.soundEngine.ensureContext();
+                window.soundEngine.playClick();
+            }
             const targetDiff = btn.getAttribute('data-difficulty');
             
             // Highlight selected button
-            diffButtons.forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
+            diffButtons.forEach(b => {
+                b.classList.remove('selected', 'active-Easy', 'active-Normal', 'active-Hard');
+            });
+            btn.classList.add('selected', 'active-' + targetDiff);
 
             // Persist setting to backend via asynchronous fetch
             try {

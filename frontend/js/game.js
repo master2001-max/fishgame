@@ -16,149 +16,37 @@ const LOGICAL_W = 880;
 const LOGICAL_H = 460;
 const WATER_SURFACE_Y = 78;
 
-const FISH_SPECIES = [
-    {
-        id: 'snapper',
-        name: 'Golden Snapper',
-        points: 100,
-        rarity: 'Common',
-        speedBase: 1.75,
-        sizeX: 25,
-        sizeY: 12,
-        color: '#fbbf24',
-        accentColor: '#d97706',
-        bellyColor: '#fef3c7',
-        glow: 'rgba(251, 191, 36, 0.25)',
-        minDepth: 115,
-        maxDepth: 250,
-    },
-    {
-        id: 'tetra',
-        name: 'Neon Blue Tetra',
-        points: 120,
-        rarity: 'Common',
-        speedBase: 2.1,
-        sizeX: 21,
-        sizeY: 10,
-        color: '#22d3ee',
-        accentColor: '#0284c7',
-        bellyColor: '#cffafe',
-        glow: 'rgba(34, 211, 238, 0.35)',
-        minDepth: 135,
-        maxDepth: 320,
-    },
-    {
-        id: 'barb',
-        name: 'Emerald Barb',
-        points: 150,
-        rarity: 'Uncommon',
-        speedBase: 2.0,
-        sizeX: 26,
-        sizeY: 13,
-        color: '#34d399',
-        accentColor: '#047857',
-        bellyColor: '#d1fae5',
-        glow: 'rgba(52, 211, 153, 0.3)',
-        minDepth: 170,
-        maxDepth: 355,
-    },
-    {
-        id: 'redfin',
-        name: 'Ruby Redfin',
-        points: 180,
-        rarity: 'Uncommon',
-        speedBase: 2.35,
-        sizeX: 28,
-        sizeY: 13,
-        color: '#fb7185',
-        accentColor: '#be123c',
-        bellyColor: '#ffe4e6',
-        glow: 'rgba(251, 113, 133, 0.32)',
-        minDepth: 200,
-        maxDepth: 385,
-    },
-    {
-        id: 'angelfish',
-        name: 'Violet Angelfish',
-        points: 250,
-        rarity: 'Rare',
-        speedBase: 2.55,
-        sizeX: 26,
-        sizeY: 16,
-        color: '#a78bfa',
-        accentColor: '#6d28d9',
-        bellyColor: '#ede9fe',
-        glow: 'rgba(167, 139, 250, 0.42)',
-        minDepth: 245,
-        maxDepth: 405,
-    },
-    {
-        id: 'biolume',
-        name: 'Abyssal Biolume',
-        points: 400,
-        rarity: 'Mythic',
-        speedBase: 3.15,
-        sizeX: 27,
-        sizeY: 12,
-        color: '#fde047',
-        accentColor: '#06b6d4',
-        bellyColor: '#fef9c3',
-        glow: 'rgba(253, 224, 71, 0.6)',
-        minDepth: 280,
-        maxDepth: 415,
-    },
-    {
-        id: 'oracle',
-        name: 'Golden Oracle of Conrad',
-        points: 150, // Balanced marks (not 1500!) so levels aren't instantly skipped
-        rarity: 'Legendary',
-        isSpecial: true, // Triggers Marc Conrad's Fish API puzzle challenge automatically!
-        speedBase: 2.2, // Smooth, approachable swimming speed
-        sizeX: 18,
-        sizeY: 9,
-        color: '#fbbf24',
-        accentColor: '#f59e0b',
-        bellyColor: '#fffbeb',
-        glow: 'rgba(251, 191, 36, 0.9)',
-        minDepth: 160,
-        maxDepth: 390,
-    },
-];
+// ========================================================
+// 2. DEVELOPER-FRIENDLY SPECIES & DIFFICULTY CONFIGURATION
+// ========================================================
+// Fish species, point values, swimming speeds, and difficulty parameters
+// are centrally managed in frontend/js/fish_config.js for developer simplicity.
+// To add new fish, change marks, or tune speeds: edit frontend/js/fish_config.js!
+const getFishSpecies = () => {
+    if (typeof window !== 'undefined' && window.FISH_SPECIES && window.FISH_SPECIES.length > 0) {
+        return window.FISH_SPECIES;
+    }
+    // Safe fallback if fish_config.js is not loaded
+    return [
+        { id: 'clownfish', name: 'Striped Clownfish', points: 40, rarity: 'Common', isSpecial: false, speedBase: 1.2, sizeX: 13, sizeY: 6.5, color: '#fb923c', accentColor: '#fdba74', bellyColor: '#ffffff', glow: null, minDepth: 75, maxDepth: 190 },
+        { id: 'tang', name: 'Azure Tang', points: 75, rarity: 'Common', isSpecial: false, speedBase: 1.45, sizeX: 15, sizeY: 8, color: '#38bdf8', accentColor: '#0284c7', bellyColor: '#bae6fd', glow: null, minDepth: 100, maxDepth: 250 },
+        { id: 'barb', name: 'Gilded Barb', points: 110, rarity: 'Uncommon', isSpecial: false, speedBase: 1.85, sizeX: 17, sizeY: 8.5, color: '#fbbf24', accentColor: '#d97706', bellyColor: '#fef3c7', glow: 'rgba(251, 191, 36, 0.45)', minDepth: 130, maxDepth: 310 },
+        { id: 'redfin', name: 'Crimson Redfin', points: 160, rarity: 'Uncommon', isSpecial: false, speedBase: 2.15, sizeX: 19, sizeY: 9.5, color: '#f43f5e', accentColor: '#be123c', bellyColor: '#ffe4e6', glow: 'rgba(244, 63, 94, 0.45)', minDepth: 170, maxDepth: 350 },
+        { id: 'angelfish', name: 'Phantom Angelfish', points: 220, rarity: 'Rare', isSpecial: false, speedBase: 2.55, sizeX: 21, sizeY: 13, color: '#c084fc', accentColor: '#7e22ce', bellyColor: '#f3e8ff', glow: 'rgba(192, 132, 252, 0.6)', minDepth: 210, maxDepth: 390 },
+        { id: 'biolume', name: 'Abyssal Biolume', points: 300, rarity: 'Mythic', isSpecial: false, speedBase: 2.85, sizeX: 24, sizeY: 11, color: '#2dd4bf', accentColor: '#0f766e', bellyColor: '#ccfbf1', glow: 'rgba(45, 212, 191, 0.85)', minDepth: 260, maxDepth: 420 },
+        { id: 'oracle', name: 'Golden Oracle of Conrad', points: 150, rarity: 'Legendary', isSpecial: true, speedBase: 2.2, sizeX: 18, sizeY: 9, color: '#fbbf24', accentColor: '#f59e0b', bellyColor: '#fffbeb', glow: 'rgba(251, 191, 36, 0.95)', minDepth: 160, maxDepth: 390 }
+    ];
+};
 
-const DIFFICULTY_CONFIG = {
-    Easy: {
-        duration: 90,
-        speedMultiplier: 0.65,
-        scoreMultiplier: 0.5,
-        jellyfishCount: 0,
-        zapPenalty: 0,
-        dropSpeed: 7.4,
-        retractSpeed: 8.4,
-        fishCount: 5,
-        levelTargets: [350, 500, 650, 850, 1050, 1250],
-    },
-    Normal: {
-        duration: 60,
-        speedMultiplier: 1.0,
-        scoreMultiplier: 1.0,
-        jellyfishCount: 1,
-        zapPenalty: 75,
-        dropSpeed: 8.2,
-        retractSpeed: 9.2,
-        fishCount: 5,
-        levelTargets: [800, 1100, 1400, 1700, 2000, 2300],
-    },
-    Hard: {
-        duration: 30,
-        speedMultiplier: 1.45,
-        scoreMultiplier: 2.0,
-        jellyfishCount: 2,
-        zapPenalty: 100,
-        dropSpeed: 9.5,
-        retractSpeed: 10.5,
-        fishCount: 6,
-        levelTargets: [1400, 1800, 2150, 2500, 2850, 3200],
-    },
+const getDifficultyConfig = () => {
+    if (typeof window !== 'undefined' && window.DIFFICULTY_CONFIG) {
+        return window.DIFFICULTY_CONFIG;
+    }
+    return {
+        Easy:   { duration: 90, speedMultiplier: 0.65, scoreMultiplier: 0.5, jellyfishCount: 0, zapPenalty: 0, dropSpeed: 7.4, retractSpeed: 9.2, fishCount: 9 },
+        Normal: { duration: 60, speedMultiplier: 1.0, scoreMultiplier: 1.0, jellyfishCount: 1, zapPenalty: 120, dropSpeed: 8.6, retractSpeed: 10.4, fishCount: 11 },
+        Hard:   { duration: 30, speedMultiplier: 1.45, scoreMultiplier: 2.0, jellyfishCount: 2, zapPenalty: 280, dropSpeed: 9.8, retractSpeed: 11.6, fishCount: 13 }
+    };
 };
 
 const LURE_STYLES = {
@@ -229,17 +117,23 @@ function createPearlEntity() {
 }
 
 function pickNextSpecies(level) {
+    const species = getFishSpecies();
+    if (!species || species.length === 0) return null;
+
+    // 25% chance to spawn the special Dr. Marc Conrad API puzzle fish
+    const oracleFish = species.find((f) => f.isSpecial || f.id === 'oracle');
+    if (oracleFish && Math.random() < 0.25) {
+        return oracleFish;
+    }
+
+    const normal = species.filter((f) => !f.isSpecial && f.id !== 'oracle');
+    if (normal.length === 0) return species[0];
+
+    // Progression curve: deeper/rarer fish appear more frequently in higher levels
+    const levelBias = Math.min(1.0, (level - 1) / 5);
     const roll = Math.random();
-    const oracleFish = FISH_SPECIES.find((f) => f.id === 'oracle');
-    // 25% spawn chance so the Special Oracle Fish is accessible in demonstrations
-    if (oracleFish && roll < 0.25) return oracleFish;
-    const bonus = Math.min((level - 1) * 0.02, 0.1);
-    if (roll < 0.25 + bonus) return FISH_SPECIES[5]; // Biolume
-    if (roll < 0.42 + bonus) return FISH_SPECIES[4]; // Angelfish
-    if (roll < 0.60) return FISH_SPECIES[3];         // Redfin
-    if (roll < 0.78) return FISH_SPECIES[2];         // Barb
-    if (roll < 0.90) return FISH_SPECIES[1];         // Tetra
-    return FISH_SPECIES[0];                         // Snapper
+    const index = Math.min(normal.length - 1, Math.floor(Math.pow(roll, 1 - levelBias * 0.45) * normal.length));
+    return normal[index];
 }
 
 // ========================================================
@@ -255,7 +149,8 @@ class FishCatcherGame {
         this.resumeSession = boot.resumeSession || null;
         this.settings = boot.settings || { music: true, sfx: true, difficulty: 'Easy', lureStyle: 'biolum' };
 
-        this.diffConf = DIFFICULTY_CONFIG[this.difficulty] || DIFFICULTY_CONFIG.Easy;
+        const diffTable = getDifficultyConfig();
+        this.diffConf = diffTable[this.difficulty] || diffTable.Easy;
 
         // Game State variables
         this.score = this.resumeSession ? this.resumeSession.score : 0;
@@ -325,16 +220,17 @@ class FishCatcherGame {
     }
 
     initFishes() {
-        const count = this.diffConf.fishCount;
+        const species = getFishSpecies();
+        const count = this.diffConf.fishCount || 10;
         const initial = [];
-        const oracle = FISH_SPECIES.find((f) => f.id === 'oracle');
-        const normal = FISH_SPECIES.filter((f) => f.id !== 'oracle');
+        const oracle = species.find((f) => f.isSpecial || f.id === 'oracle');
 
-        if (oracle && Math.random() < 0.35) {
+        // Chance to spawn special Marc Conrad API puzzle fish at round start
+        if (oracle && Math.random() < 0.40) {
             initial.push(oracle);
         }
         while (initial.length < count) {
-            initial.push(normal[Math.floor(Math.random() * normal.length)]);
+            initial.push(pickNextSpecies(this.level));
         }
         this.sim.fishes = initial.map((sp) => createFishEntity(sp, false));
         this.sim.jellyfishes = Array.from({ length: this.diffConf.jellyfishCount }, (_, i) =>
@@ -346,6 +242,50 @@ class FishCatcherGame {
         if (window.soundEngine) {
             window.soundEngine.setSfxEnabled(this.settings.sfx);
             window.soundEngine.setMusicEnabled(this.settings.music);
+            if (this.settings.music && !this.isPaused && this.missionStatus === 'playing') {
+                window.soundEngine.startBGM();
+            } else {
+                window.soundEngine.stopBGM();
+            }
+        }
+        this.updateSoundUI();
+    }
+
+    updateSoundUI() {
+        const btn = document.getElementById('muteBtn');
+        const iconWrap = document.getElementById('muteIconWrap');
+        const label = document.getElementById('muteLabel');
+        if (!btn) return;
+
+        const isAudioActive = Boolean(this.settings.sfx || this.settings.music);
+
+        if (isAudioActive) {
+            btn.classList.remove('sound-muted');
+            btn.classList.add('sound-active');
+            btn.title = 'Audio is ON (Click to Mute SFX & Energetic BGM)';
+            if (label) label.textContent = 'Audio: ON';
+            if (iconWrap) {
+                iconWrap.innerHTML = `
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    </svg>
+                `;
+            }
+        } else {
+            btn.classList.remove('sound-active');
+            btn.classList.add('sound-muted');
+            btn.title = 'Audio is MUTED (Click to Turn Sound & Music ON)';
+            if (label) label.textContent = 'Audio: MUTED';
+            if (iconWrap) {
+                iconWrap.innerHTML = `
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <line x1="23" y1="9" x2="17" y2="15"></line>
+                        <line x1="17" y1="9" x2="23" y2="15"></line>
+                    </svg>
+                `;
+            }
         }
     }
 
@@ -403,19 +343,45 @@ class FishCatcherGame {
             }
         });
 
+        // Unlock Web Audio context & start energetic arcade BGM on first user gesture
+        const unlockAudioOnGesture = () => {
+            if (window.soundEngine) {
+                window.soundEngine.ensureContext();
+                if (this.settings.music && !this.isPaused && this.missionStatus === 'playing') {
+                    window.soundEngine.startBGM();
+                }
+            }
+        };
+        this.canvas.addEventListener('pointerdown', unlockAudioOnGesture, { once: true });
+        window.addEventListener('keydown', unlockAudioOnGesture, { once: true });
+
         // Pause button
         document.getElementById('pauseBtn')?.addEventListener('click', () => {
             if (window.soundEngine) window.soundEngine.playClick();
             this.togglePause();
         });
 
-        // Quick mute toggle button
+        // Quick mute toggle button with clear visual preview & BGM control
         document.getElementById('muteBtn')?.addEventListener('click', () => {
-            if (window.soundEngine) window.soundEngine.playClick();
-            const isMuted = !this.settings.sfx && !this.settings.music;
-            this.settings.sfx = isMuted;
-            this.settings.music = isMuted;
+            if (window.soundEngine) {
+                window.soundEngine.ensureContext();
+            }
+            const isCurrentlyMuted = !this.settings.sfx && !this.settings.music;
+            const newActiveState = isCurrentlyMuted; // Toggle: If muted, enable sound; if active, mute
+            this.settings.sfx = newActiveState;
+            this.settings.music = newActiveState;
+
+            if (window.soundEngine && newActiveState) {
+                window.soundEngine.playClick();
+            }
             this.initAudio();
+
+            if (this.catchBanner) {
+                this.catchBanner.textContent = newActiveState 
+                    ? '🔊 Sound & Energetic Arcade BGM Enabled!' 
+                    : '🔇 Audio Muted (Silent Mode)';
+            }
+
             fetch('../backend/actions/update_settings.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -466,12 +432,6 @@ class FishCatcherGame {
                 this.restartMission();
             }
         });
-
-        document.getElementById('consultOracleBtn')?.addEventListener('click', () => {
-            if (window.soundEngine) window.soundEngine.playClick();
-            this.outcomeModal.style.display = 'none';
-            this.openOracleChallenge();
-        });
     }
 
     triggerDrop() {
@@ -485,6 +445,13 @@ class FishCatcherGame {
         if (this.missionStatus !== 'playing') return;
         this.isPaused = !this.isPaused;
         this.pauseModal.style.display = this.isPaused ? 'flex' : 'none';
+        if (window.soundEngine) {
+            if (this.isPaused) {
+                window.soundEngine.stopBGM();
+            } else if (this.settings.music) {
+                window.soundEngine.startBGM();
+            }
+        }
     }
 
     startCountdown() {
@@ -568,6 +535,9 @@ class FishCatcherGame {
         this.isPaused = true;
         this.isOracleOpen = true;
         this.oracleModal.style.display = 'flex';
+        if (window.soundEngine) {
+            window.soundEngine.stopBGM();
+        }
 
         const loading = document.getElementById('oracleLoading');
         const content = document.getElementById('oracleContent');
@@ -676,6 +646,9 @@ class FishCatcherGame {
         this.oracleModal.style.display = 'none';
         this.isOracleOpen = false;
         this.isPaused = false;
+        if (window.soundEngine && this.settings.music && this.missionStatus === 'playing') {
+            window.soundEngine.startBGM();
+        }
         this.updateHUD();
 
         // Check if level was cleared after receiving oracle marks
@@ -689,6 +662,9 @@ class FishCatcherGame {
     // ========================================================
     async handleMissionOutcome() {
         if (this.missionStatus !== 'playing') return;
+        if (window.soundEngine) {
+            window.soundEngine.stopBGM();
+        }
 
         const won = (this.score >= this.targetMarks);
         this.missionStatus = won ? 'won' : 'lost';
@@ -731,7 +707,6 @@ class FishCatcherGame {
         const catchesVal = document.getElementById('outcomeCatchesVal');
         const shortfallMsg = document.getElementById('outcomeShortfallMsg');
         const highScorePill = document.getElementById('highScorePill');
-        const consultOracleBtn = document.getElementById('consultOracleBtn');
         const primaryBtnText = document.getElementById('primaryOutcomeBtnText');
 
         scoreVal.textContent = this.score.toLocaleString();
@@ -756,7 +731,6 @@ class FishCatcherGame {
             title.textContent = (this.level === 6) ? `${this.difficulty} Mode Cleared!` : `Level ${this.level} Complete!`;
             subtitle.textContent = `Target reached on ${this.difficulty} currents. High hunter mastery!`;
             shortfallMsg.style.display = 'none';
-            consultOracleBtn.style.display = 'inline-flex';
 
             primaryBtnText.textContent = (this.level === 6) ? 'Conquer Next Difficulty' : `Next Level (Lv. ${this.level + 1})`;
         } else {
@@ -769,7 +743,6 @@ class FishCatcherGame {
             subtitle.textContent = `Collect ${this.targetMarks.toLocaleString()} marks before time runs out.`;
             shortfallMsg.style.display = 'block';
             shortfallMsg.textContent = `Short by ${(this.targetMarks - this.score).toLocaleString()} marks`;
-            consultOracleBtn.style.display = 'none';
 
             primaryBtnText.textContent = `Retry Level ${this.level}`;
         }
@@ -803,6 +776,9 @@ class FishCatcherGame {
         this.pauseModal.style.display = 'none';
         this.outcomeModal.style.display = 'none';
         this.catchBanner.textContent = `Target: ${this.targetMarks.toLocaleString()} marks · Steer with mouse or A/D · Click or Space to drop hook`;
+        if (window.soundEngine && this.settings.music) {
+            window.soundEngine.startBGM();
+        }
         this.initFishes();
         this.updateHUD();
     }

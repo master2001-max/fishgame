@@ -440,83 +440,131 @@ button {
 .difficulty-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-top: 6px;
+    gap: 12px;
+    margin-top: 8px;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
     .difficulty-grid {
         grid-template-columns: 1fr;
     }
 }
 
-.diff-card {
-    padding: 12px;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(3, 15, 32, 0.4);
+.diff-card,
+.difficulty-card {
+    padding: 14px 12px;
+    border-radius: 18px;
+    border: 1px solid rgba(103, 232, 249, 0.18);
+    background: rgba(4, 20, 42, 0.75);
+    backdrop-filter: blur(14px);
     text-align: left;
     cursor: pointer;
-    transition: all 0.2s ease;
-    color: inherit;
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    color: #f1f5f9;
     text-decoration: none;
-    display: block;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
 }
 
-.diff-card:hover {
-    border-color: rgba(34, 211, 238, 0.4);
+.diff-card:hover,
+.difficulty-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(103, 232, 249, 0.5);
+    box-shadow: 0 12px 28px -6px rgba(0, 0, 0, 0.6);
 }
 
-.diff-card.active-Easy {
-    background: rgba(52, 211, 153, 0.15);
-    border-color: rgba(52, 211, 153, 0.7);
-    box-shadow: 0 0 20px rgba(52, 211, 153, 0.18);
+/* Selected Difficulty Glowing State */
+.diff-card.selected,
+.difficulty-card.selected {
+    border-width: 2px;
 }
 
-.diff-card.active-Normal {
-    background: rgba(34, 211, 238, 0.18);
-    border-color: rgba(34, 211, 238, 0.75);
-    box-shadow: 0 0 20px rgba(34, 211, 238, 0.18);
+.diff-card.selected.active-Easy,
+.difficulty-card.selected[data-difficulty="Easy"] {
+    background: linear-gradient(165deg, rgba(52, 211, 153, 0.22) 0%, rgba(6, 78, 59, 0.45) 100%);
+    border-color: #34d399;
+    box-shadow: 0 0 24px rgba(52, 211, 153, 0.35), inset 0 0 12px rgba(52, 211, 153, 0.15);
 }
 
-.diff-card.active-Hard {
-    background: rgba(251, 113, 133, 0.15);
-    border-color: rgba(251, 113, 133, 0.7);
-    box-shadow: 0 0 20px rgba(251, 113, 133, 0.18);
+.diff-card.selected.active-Normal,
+.difficulty-card.selected[data-difficulty="Normal"] {
+    background: linear-gradient(165deg, rgba(34, 211, 238, 0.25) 0%, rgba(8, 47, 73, 0.5) 100%);
+    border-color: #22d3ee;
+    box-shadow: 0 0 24px rgba(34, 211, 238, 0.35), inset 0 0 12px rgba(34, 211, 238, 0.15);
+}
+
+.diff-card.selected.active-Hard,
+.difficulty-card.selected[data-difficulty="Hard"] {
+    background: linear-gradient(165deg, rgba(251, 113, 133, 0.22) 0%, rgba(136, 19, 55, 0.45) 100%);
+    border-color: #fb7185;
+    box-shadow: 0 0 24px rgba(251, 113, 133, 0.35), inset 0 0 12px rgba(251, 113, 133, 0.15);
 }
 
 .diff-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 4px;
+    gap: 6px;
+    width: 100%;
 }
 
 .diff-name {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 800;
-    color: #fff;
+    color: #ffffff;
 }
 
-.diff-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #475569;
+.difficulty-card[data-difficulty="Easy"] .diff-name { color: #6ee7b7; }
+.difficulty-card[data-difficulty="Normal"] .diff-name { color: #67e8f9; }
+.difficulty-card[data-difficulty="Hard"] .diff-name { color: #fda4af; }
+
+.diff-time,
+.diff-time-badge {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #e2e8f0;
+    letter-spacing: 0.04em;
 }
 
-.diff-card.active-Easy .diff-dot   { background: #34d399; }
-.diff-card.active-Normal .diff-dot { background: #22d3ee; }
-.diff-card.active-Hard .diff-dot   { background: #fb7185; }
+.diff-badge,
+.diff-speed-pill {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 2px 7px;
+    border-radius: 6px;
+    width: fit-content;
+}
 
-.diff-sub {
+.difficulty-card[data-difficulty="Easy"] .diff-badge {
+    background: rgba(52, 211, 153, 0.16);
+    color: #a7f3d0;
+}
+
+.difficulty-card[data-difficulty="Normal"] .diff-badge {
+    background: rgba(34, 211, 238, 0.16);
+    color: #bae6fd;
+}
+
+.difficulty-card[data-difficulty="Hard"] .diff-badge {
+    background: rgba(251, 113, 133, 0.16);
+    color: #fecdd3;
+}
+
+.diff-desc {
     font-size: 11px;
-    font-weight: 600;
+    color: #94a3b8;
+    line-height: 1.35;
+    margin-top: 2px;
 }
-
-.diff-card.active-Easy .diff-sub   { color: #6ee7b7; }
-.diff-card.active-Normal .diff-sub { color: #67e8f9; }
-.diff-card.active-Hard .diff-sub   { color: #fda4af; }
 
 .diff-progress-label {
     font-size: 11px;
@@ -1089,6 +1137,61 @@ button {
 .hub-btn-nav {
     height: 44px;
     font-size: 13px;
+}
+
+.btn-text-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.btn-subtext {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.85;
+    color: #bae6fd;
+}
+
+/* Enhanced Audio Toggle Button with Visual States */
+.hud-sound-btn {
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    border: 1px solid rgba(103, 232, 249, 0.25);
+    background: rgba(15, 43, 76, 0.65);
+    color: #e2e8f0;
+}
+
+.hud-sound-btn:hover {
+    transform: translateY(-1px);
+}
+
+.hud-sound-btn.sound-active {
+    border-color: rgba(34, 211, 238, 0.8);
+    background: linear-gradient(135deg, rgba(8, 47, 73, 0.85), rgba(6, 78, 59, 0.5));
+    box-shadow: 0 0 16px rgba(34, 211, 238, 0.4), inset 0 0 8px rgba(34, 211, 238, 0.2);
+    color: #67e8f9;
+}
+
+.hud-sound-btn.sound-muted {
+    border-color: rgba(244, 63, 94, 0.5);
+    background: rgba(30, 41, 59, 0.8);
+    color: #fb7185;
+    box-shadow: 0 0 12px rgba(244, 63, 94, 0.2);
+}
+
+.hud-sound-text {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
 }
 
 /* Game Screen Layout (game.php) */
